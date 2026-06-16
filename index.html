@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเช็ครายรับรายจ่ายแบบ Dynamic</title>
+    <!-- ใช้ Tailwind CSS สำหรับตกแต่งหน้าตาผ่าน CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- โหลด Supabase JS SDK มาใช้งาน -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+
+    <script>
+        // 🛠️ คอนฟิกค่าจำเพาะของ Supabase (นำมาจากเว็บ Supabase ของคุณ)
+        const SUPABASE_URL = "https://tseftsnzyrbcrajearxz.supabase.co/rest/v1/";
+        const SUPABASE_KEY = "sb_publishable_0cfkLjDHdpoDicbNNf68OA_ZWsZdPak";
+        
+        // เริ่มต้นเชื่อมต่อฐานข้อมูล
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    </script>
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <h1 class="text-3xl font-bold text-center text-gray-800">💰 บันทึกรายรับ-รายจ่าย</h1>
+
+        <!-- ส่วนที่ 1: ส่วนเพิ่มรายการเงินและเลือกปุ่มหมวดหมู่ -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
+            <h2 class="text-xl font-semibold text-gray-700">✍️ บันทึกรายการใหม่</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">จำนวนเงิน (บาท)</label>
+                    <input type="number" id="txAmount" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
+                    <input type="text" id="txNote" placeholder="กินอะไรมา, ซื้ออะไรไป" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+
+            <!-- โซนเลือกปุ่มหมวดหมู่รายจ่าย -->
+            <div>
+                <label class="block text-sm font-medium text-red-600 mb-2">🔴 เลือกหมวดหมู่รายจ่าย (คลิกเพื่อบันทึกทันที)</label>
+                <div id="expenseButtons" class="flex flex-wrap gap-2">
+                    <!-- ปุ่มรายจ่ายจากฐานข้อมูลจะมาโผล่ตรงนี้ -->
+                </div>
+            </div>
+
+            <!-- โซนเลือกปุ่มหมวดหมู่รายรับ -->
+            <div>
+                <label class="block text-sm font-medium text-green-600 mb-2">🟢 เลือกหมวดหมู่รายรับ (คลิกเพื่อบันทึกทันที)</label>
+                <div id="incomeButtons" class="flex flex-wrap gap-2">
+                    <!-- ปุ่มรายรับจากฐานข้อมูลจะมาโผล่ตรงนี้ -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ส่วนที่ 2: หน้าตั้งค่าหลังบ้าน (แก้ไขปุ่มกดบนหน้าเว็บได้เลย) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
+            <h2 class="text-xl font-semibold text-gray-700">⚙️ ตั้งค่าปุ่มกด/หมวดหมู่ (ไม่ต้อง Hardcode)</h2>
+            <div class="flex flex-wrap gap-2 items-end">
+                <div class="flex-1 min-w-[150px]">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">ชื่อหมวดหมู่ใหม่</label>
+                    <input type="text" id="newCatName" placeholder="เช่น ค่าจิปาถะ" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">ประเภท</label>
+                    <select id="newCatType" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                        <option value="expense">รายจ่าย 🔴</option>
+                        <option value="income">รายรับ 🟢</option>
+                    </select>
+                </div>
+                <button onclick="addCategory()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition">➕ เพิ่มปุ่ม</button>
+            </div>
+
+            <!-- รายการปุ่มปัจจุบันที่สามารถกดลบได้ -->
+            <div class="border-t pt-4">
+                <p class="text-sm font-medium text-gray-500 mb-2">รายการปุ่มทั้งหมดในระบบ (คลิก ❌ เพื่อลบปุ่มออก)</p>
+                <div id="manageCategoriesList" class="flex flex-wrap gap-2">
+                    <!-- รายชื่อปุ่มสำหรับจัดการจะแสดงตรงนี้ -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ส่วนที่ 3: ตารางแสดงประวัติธุรกรรมล่าสุด -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4 overflow-x-auto">
+            <h2 class="text-xl font-semibold text-gray-700">📋 ประวัติการทำรายการล่าสุด</h2>
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-gray-200 text-gray-500 text-sm">
+                        <th class="pb-2">วัน-เวลา</th>
+                        <th class="pb-2">ประเภท</th>
+                        <th class="pb-2">หมวดหมู่</th>
+                        <th class="pb-2">จำนวนเงิน</th>
+                        <th class="pb-2">บันทึก</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionTableBody" class="text-gray-700 divide-y divide-gray-100">
+                    <!-- ประวัติจะมาแสดงตรงนี้ -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ส่วนควบคุม Logic การทำงานหลังบ้านด้วย JavaScript -->
+    <script>
+        // โหลดข้อมูลทุกอย่างเมื่อเปิดหน้าเว็บครั้งแรก
+        window.onload = async function() {
+            await loadCategories();
+            await loadTransactions();
+        }
+
+        // 1. ฟังก์ชันดึงข้อมูลหมวดหมู่มาสร้างเป็นปุ่มกด
+        async function loadCategories() {
+            const { data: categories, error } = await supabase
+                .from('categories')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) return alert('เกิดข้อผิดพลาดในการดึงข้อมูลหมวดหมู่: ' + error.message);
+
+            const expenseArea = document.getElementById('expenseButtons');
+            const incomeArea = document.getElementById('incomeButtons');
+            const manageArea = document.getElementById('manageCategoriesList');
+
+            // ล้างข้อมูลเก่าก่อนเรนเดอร์ใหม่
+            expenseArea.innerHTML = '';
+            incomeArea.innerHTML = '';
+            manageArea.innerHTML = '';
+
+            categories.forEach(cat => {
+                // สร้างปุ่มสำหรับคลิกบันทึกเงินด้านบน
+                const btn = document.createElement('button');
+                btn.innerText = cat.name;
+                btn.className = cat.type === 'expense' 
+                    ? "bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-xl font-medium hover:bg-red-100 active:scale-95 transition"
+                    : "bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded-xl font-medium hover:bg-green-100 active:scale-95 transition";
+                
+                btn.onclick = () => saveTransaction(cat.name, cat.type);
+
+                if (cat.type === 'expense') expenseArea.appendChild(btn);
+                else incomeArea.appendChild(btn);
+
+                // สร้างปุ่มกากบาทสำหรับบริหารจัดการลบปุ่มด้านหลังบ้าน
+                const manageBadge = document.createElement('span');
+                manageBadge.className = `inline-flex items-center gap-1 text-sm px-3 py-1 rounded-full ${cat.type === 'expense' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`;
+                manageBadge.innerHTML = `${cat.name} <button onclick="deleteCategory(${cat.id})" class="hover:text-black font-bold ml-1 text-xs">❌</button>`;
+                manageArea.appendChild(manageBadge);
+            });
+        }
+
+        // 2. ฟังก์ชันเพิ่มหมวดหมู่ใหม่ (สร้างปุ่มเพิ่มแบบ Dynamic ไม่ต้อง hardcode)
+        async function addCategory() {
+            const nameInput = document.getElementById('newCatName');
+            const typeInput = document.getElementById('newCatType');
+
+            if (!nameInput.value.trim()) return alert('กรุณากรอกชื่อหมวดหมู่');
+
+            const { error } = await supabase
+                .from('categories')
+                .insert([{ name: nameInput.value.trim(), type: typeInput.value }]);
+
+            if (error) {
+                alert('ไม่สามารถเพิ่มได้: ' + error.message);
+            } else {
+                nameInput.value = '';
+                await loadCategories(); // โหลดปุ่มเซ็ตใหม่ทันที
+            }
+        }
+
+        // 3. ฟังก์ชันลบหมวดหมู่ปุ่มกด
+        async function deleteCategory(id) {
+            if (!confirm('คุณแน่ใจใช่ไหมที่จะลบปุ่มหมวดหมู่นี้?')) return;
+            const { error } = await supabase.from('categories').delete().eq('id', id);
+            if (error) alert('ลบไม่สำเร็จ: ' + error.message);
+            else await loadCategories();
+        }
+
+        // 4. ฟังก์ชันบันทึกรายรับรายจ่ายเมื่อกดปุ่มหมวดหมู่
+        async function saveTransaction(categoryName, type) {
+            const amountInput = document.getElementById('txAmount');
+            const noteInput = document.getElementById('txNote');
+            const amount = parseFloat(amountInput.value);
+
+            if (!amount || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนกดเลือกปุ่มหมวดหมู่ครับ');
+
+            const { error } = await supabase
+                .from('transactions')
+                .insert([{ 
+                    amount: amount, 
+                    type: type, 
+                    category_name: categoryName, 
+                    note: noteInput.value.trim() || null 
+                }]);
+
+            if (error) {
+                alert('บันทึกรายการล้มเหลว: ' + error.message);
+            } else {
+                // ล้างช่องกรอกเงินหลังบันทึกเสร็จ
+                amountInput.value = '';
+                noteInput.value = '';
+                await loadTransactions(); // อัปเดตตารางประวัติทันที
+            }
+        }
+
+        // 5. ฟังก์ชันดึงประวัติธุรกรรมมาโชว์ในตาราง
+        async function loadTransactions() {
+            const { data: txs, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(20); // ดึงมาโชว์ล่าสุด 20 รายการ
+
+            if (error) return console.error(error);
+
+            const tbody = document.getElementById('transactionTableBody');
+            tbody.innerHTML = '';
+
+            txs.forEach(tx => {
+                const date = new Date(tx.created_at).toLocaleString('th-TH', { hour12: false });
+                const row = document.createElement('tr');
+                row.className = "text-sm";
+                row.innerHTML = `
+                    <td class="py-2.5 text-gray-400">${date}</td>
+                    <td class="py-2.5 font-medium ${tx.type === 'expense' ? 'text-red-500' : 'text-green-500'}">${tx.type === 'expense' ? 'รายจ่าย 🔴' : 'รายรับ 🟢'}</td>
+                    <td class="py-2.5 font-medium">${tx.category_name}</td>
+                    <td class="py-2.5 font-bold">${tx.amount.toLocaleString()} บาท</td>
+                    <td class="py-2.5 text-gray-500 text-xs">${tx.note || '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>
