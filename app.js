@@ -1,4 +1,4 @@
-// app.js - ฟังก์ชันควบคุมเวอร์ชันใช้งานร่วมกับแฟน
+// app.js - เวอร์ชันแก้บั๊กชื่อตัวแปรซ้ำ
 
 window.onload = async function() {
     await loadCategories();
@@ -6,7 +6,8 @@ window.onload = async function() {
 }
 
 async function loadCategories() {
-    const { data: categories, error } = await supabase
+    // เปลี่ยนเป็น supabaseClient
+    const { data: categories, error } = await supabaseClient
         .from('categories')
         .select('*')
         .order('name', { ascending: true });
@@ -46,7 +47,8 @@ async function addCategory() {
 
     if (!nameInput.value.trim()) return alert('กรุณากรอกชื่อหมวดหมู่');
 
-    const { error } = await supabase
+    // เปลี่ยนเป็น supabaseClient
+    const { error } = await supabaseClient
         .from('categories')
         .insert([{ name: nameInput.value.trim(), type: typeInput.value }]);
 
@@ -60,12 +62,12 @@ async function addCategory() {
 
 async function deleteCategory(id) {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบปุ่มหมวดหมู่นี้?')) return;
-    const { error } = await supabase.from('categories').delete().eq('id', id);
+    // เปลี่ยนเป็น supabaseClient
+    const { error } = await supabaseClient.from('categories').delete().eq('id', id);
     if (error) alert('ลบไม่สำเร็จ: ' + error.message);
     else await loadCategories();
 }
 
-// ฟังก์ชันบันทึกรายรับรายจ่ายแบบระบุเจ้าของเงินได้ด้วย
 async function saveTransaction(categoryName, type) {
     const amountInput = document.getElementById('txAmount');
     const noteInput = document.getElementById('txNote');
@@ -74,7 +76,8 @@ async function saveTransaction(categoryName, type) {
 
     if (!amount || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนกดเลือกปุ่มหมวดหมู่ครับ');
 
-    const { error } = await supabase
+    // เปลี่ยนเป็น supabaseClient
+    const { error } = await supabaseClient
         .from('transactions')
         .insert([{ 
             amount: amount, 
@@ -94,8 +97,8 @@ async function saveTransaction(categoryName, type) {
 }
 
 async function loadTransactions() {
-    // ดึงข้อมูลรายการล่าสุด 50 รายการมาคำนวณและแสดงผล
-    const { data: txs, error } = await supabase
+    // เปลี่ยนเป็น supabaseClient
+    const { data: txs, error } = await supabaseClient
         .from('transactions')
         .select('*')
         .order('created_at', { ascending: false })
@@ -106,19 +109,16 @@ async function loadTransactions() {
     const tbody = document.getElementById('transactionTableBody');
     tbody.innerHTML = '';
 
-    // ตัวแปรเก็บยอดรวมสุทธิแต่ละกระเป๋า (คิดแบบ รายรับ ลบ รายจ่าย)
     let myTotal = 0;
     let partnerTotal = 0;
     let sharedTotal = 0;
 
     txs.forEach(tx => {
-        // คำนวณยอดเงินแยกตามกระเป๋า
         const value = tx.type === 'income' ? tx.amount : -tx.amount;
         if (tx.owner === 'me') myTotal += value;
         else if (tx.owner === 'partner') partnerTotal += value;
         else sharedTotal += value;
 
-        // จัดการหน้าตาป้ายชื่อกระเป๋าเงิน
         let ownerBadge = '';
         if (tx.owner === 'me') ownerBadge = '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">🙋‍♂️ ฉัน</span>';
         else if (tx.owner === 'partner') ownerBadge = '<span class="bg-pink-100 text-pink-800 text-xs px-2 py-0.5 rounded-full">🙋‍♀️ แฟน</span>';
@@ -138,7 +138,6 @@ async function loadTransactions() {
         tbody.appendChild(row);
     });
 
-    // อัปเดตยอดเงินขึ้น Dashboard ด้านบนสุด
     document.getElementById('myTotal').innerText = `${myTotal.toLocaleString()} บาท`;
     document.getElementById('partnerTotal').innerText = `${partnerTotal.toLocaleString()} บาท`;
     document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString()} บาท`;
