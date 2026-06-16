@@ -3,41 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบเช็ครายรับรายจ่ายแบบ Dynamic</title>
+    <title>ระบบเช็ครายรับรายจ่ายคู่รัก (Dynamic)</title>
+    <!-- โหลด Tailwind CSS ผ่าน CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- โหลด Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- เชื่อมโยงไฟล์คอนฟิกและไฟล์ระบบ -->
+    <script src="config.js" defer></script>
     <script src="app.js" defer></script>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto space-y-6">
-        <h1 class="text-3xl font-bold text-center text-gray-800">💰 บันทึกรายรับ-รายจ่าย</h1>
+        <h1 class="text-3xl font-bold text-center text-gray-800">👩‍❤️‍👨 บันทึกรายรับ-รายจ่ายของเรา</h1>
 
+        <!-- 📊 ส่วนที่เพิ่มเข้ามาใหม่: สรุปภาพรวมกระเป๋าเงิน -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl shadow-sm text-center">
+                <p class="text-sm font-medium text-blue-600">กระเป๋าของฉัน 🙋‍♂️</p>
+                <p id="myTotal" class="text-2xl font-bold text-blue-800">0 บาท</p>
+            </div>
+            <div class="bg-pink-50 border border-pink-200 p-4 rounded-2xl shadow-sm text-center">
+                <p class="text-sm font-medium text-pink-600">กระเป๋าของแฟน 🙋‍♀️</p>
+                <p id="partnerTotal" class="text-2xl font-bold text-pink-800">0 บาท</p>
+            </div>
+            <div class="bg-purple-50 border border-purple-200 p-4 rounded-2xl shadow-sm text-center">
+                <p class="text-sm font-medium text-purple-600">เงินกองกลางร่วมกัน 🤝</p>
+                <p id="sharedTotal" class="text-2xl font-bold text-purple-800">0 บาท</p>
+            </div>
+        </div>
+
+        <!-- ส่วนที่ 1: ส่วนเพิ่มรายการเงินและเลือกปุ่มหมวดหมู่ -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
             <h2 class="text-xl font-semibold text-gray-700">✍️ บันทึกรายการใหม่</h2>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-600 mb-1">จำนวนเงิน (บาท)</label>
-                    <input type="number" id="txAmount" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="number" id="txAmount" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-600 mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
-                    <input type="text" id="txNote" placeholder="กินอะไรมา, ซื้ออะไรไป" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="text" id="txNote" placeholder="กินอะไรมา, ซื้ออะไรไป" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                </div>
+                <!-- 🔘 เพิ่มวิทเจ็ตเลือกเจ้าของเงิน -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">รายการนี้เป็นของใคร?</label>
+                    <select id="txOwner" class="w-full border border-gray-300 rounded-lg p-2 outline-none bg-white">
+                        <option value="shared">🤝 ใช้ร่วมกัน (หารครึ่ง/กองกลาง)</option>
+                        <option value="me">🙋‍♂️ ของฉันคนเดียว</option>
+                        <option value="partner">🙋‍♀️ ของแฟนคนเดียว</option>
+                    </select>
                 </div>
             </div>
 
+            <!-- โซนเลือกปุ่มหมวดหมู่รายจ่าย -->
             <div>
                 <label class="block text-sm font-medium text-red-600 mb-2">🔴 เลือกหมวดหมู่รายจ่าย (คลิกเพื่อบันทึกทันที)</label>
                 <div id="expenseButtons" class="flex flex-wrap gap-2"></div>
             </div>
 
+            <!-- โซนเลือกปุ่มหมวดหมู่รายรับ -->
             <div>
                 <label class="block text-sm font-medium text-green-600 mb-2">🟢 เลือกหมวดหมู่รายรับ (คลิกเพื่อบันทึกทันที)</label>
                 <div id="incomeButtons" class="flex flex-wrap gap-2"></div>
             </div>
         </div>
 
+        <!-- ส่วนที่ 2: หน้าตั้งค่าหลังบ้าน (แก้ไขปุ่มกดบนหน้าเว็บได้เลย) -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
             <h2 class="text-xl font-semibold text-gray-700">⚙️ ตั้งค่าปุ่มกด/หมวดหมู่</h2>
             <div class="flex flex-wrap gap-2 items-end">
@@ -52,7 +85,7 @@
                         <option value="income">รายรับ 🟢</option>
                     </select>
                 </div>
-                <button onclick="addCategory()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition">➕ เพิ่มปุ่ม</button>
+                <button onclick="addCategory()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition cursor-pointer">➕ เพิ่มปุ่ม</button>
             </div>
 
             <div class="border-t pt-4">
@@ -61,12 +94,14 @@
             </div>
         </div>
 
+        <!-- ส่วนที่ 3: ตารางแสดงประวัติธุรกรรมล่าสุด -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4 overflow-x-auto">
             <h2 class="text-xl font-semibold text-gray-700">📋 ประวัติการทำรายการล่าสุด</h2>
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="border-b border-gray-200 text-gray-500 text-sm">
                         <th class="pb-2">วัน-เวลา</th>
+                        <th class="pb-2">กระเป๋า</th>
                         <th class="pb-2">ประเภท</th>
                         <th class="pb-2">หมวดหมู่</th>
                         <th class="pb-2">จำนวนเงิน</th>
