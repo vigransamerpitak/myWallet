@@ -395,20 +395,27 @@ async function loadTransactions() {
     document.getElementById('emergencyTotal').innerText = `${emergencyTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
 
     const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared;
+// 🛠️ ปรับลอจิกการแสดงผลบิลหารครึ่ง ไม่ให้กล่องดีดหายเวลาบันทึกเงินส่วนตัว
     const billTextEl = document.getElementById('billSummaryText');
 
-    if (grandSharedExpense === 0) {
-        billTextEl.innerText = "🎉 ยอดส่วนกลางประจำช่วงเวลานี้เจ๊ากันพอดี ไม่มีใครค้างตังค์ใครครับ";
+    if (totalMePaidShared === 0 && totalPartnerPaidShared === 0) {
+        billTextEl.innerHTML = `
+            <div class="text-center py-2">
+                🎉 ยังไม่มีรายจ่ายกองกลางร่วมกันในเดือนนี้<br>
+                <span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะหารครึ่งให้ทันทีเมื่อจดรายการที่ผูกกับกระเป๋า "กองกลาง")</span>
+            </div>
+        `;
     } else {
+        const grandSharedExpense = totalMePaidShared + totalPartnerPartnerShared || (totalMePaidShared + totalPartnerPaidShared);
         const halfShare = grandSharedExpense / 2;
         let settlementResultText = "";
 
         if (totalMePaidShared > totalPartnerPaidShared) {
             const diff = totalMePaidShared - halfShare;
-            settlementResultText = `🙋‍♀️ แฟนต้องโอนคืนให้คุณ: <span class="fw-bold underline text-white fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
+            settlementResultText = `🙋‍♀️ แฟนต้องโอนคืนให้คุณ: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
         } else if (totalPartnerPaidShared > totalMePaidShared) {
             const diff = totalPartnerPaidShared - halfShare;
-            settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold underline text-danger-emphasis fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
+            settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold text-danger-emphasis fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
         } else {
             settlementResultText = `🤝 ยอดออกเงินคนละครึ่งเท่ากันเป๊ะ พอดิบพอดีจ้า!`;
         }
