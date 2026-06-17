@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบคู่รักนักออม - Bootstrap 5 Version</title>
+    <title>ระบบคู่รักนักออม - Ultimate Auto-Detect User</title>
     <link rel="manifest" href="manifest.json">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -15,8 +15,13 @@
         async function checkUserAuth() {
             setTimeout(async () => {
                 const { data } = await supabaseClient.auth.getSession();
-                if (!data.session) { window.location.href = 'login.html'; }
-                else { document.getElementById('userDisplay').innerText = `ผู้ใช้งาน: ${data.session.user.email}`; }
+                if (!data.session) { 
+                    window.location.href = 'login.html'; 
+                } else { 
+                // ของเดิม: initUserIdentity(data.session.user.email);
+                // เปลี่ยนเป็น:
+                initUserIdentity(data.session.user.id); // ส่งรหัส UID ไปแทน
+                }
             }, 300);
         }
         checkUserAuth();
@@ -27,7 +32,6 @@
         }
     </script>
     <style>
-        /* ตกแต่ง Toast เพิ่มเติมให้อยู่เหนือทุกสิ่ง */
         #toastNotification {
             position: fixed;
             bottom: 20px;
@@ -44,8 +48,9 @@
         .cursor-pointer { cursor: pointer; }
     </style>
 </head>
-<body class="bg-light pdf-4 py-5">
+<body class="bg-light pdf-4 py-4">
 
+    <!-- 🍞 กล่อง Toast แจ้งเตือนสไตล์ Bootstrap -->
     <div id="toastNotification" class="toast align-items-center text-white bg-dark border-0 p-2 d-flex shadow" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex w-full">
             <div class="toast-body">
@@ -57,13 +62,15 @@
 
     <div class="container" style="max-width: 900px;">
         
+        <!-- แถบผู้ใช้ (ปรับปรุงเพื่อแสดงไอคอนบอกตัวตนที่ล็อกอินชัดเจน) -->
         <div class="d-flex justify-content-between align-items-center bg-white p-3 rounded-3 shadow-sm mb-4">
-            <span id="userDisplay" class="fw-medium text-secondary">กำลังตรวจสอบ...</span>
+            <span id="userDisplay" class="fw-bold text-indigo"><i class="bi bi-person-circle me-1"></i> กำลังระบุตัวตน...</span>
             <button onclick="handleLogout()" class="btn btn-outline-secondary btn-sm">🚪 ออกจากระบบ</button>
         </div>
 
         <h1 class="text-center fw-bold text-dark mb-4">👩‍❤️‍👨 บันทึกรายรับ-รายจ่ายคู่รัก</h1>
 
+        <!-- 📊 สรุปภาพรวมกระเป๋าเงิน 4 กล่อง -->
         <div class="row g-3 mb-4">
             <div class="col-12 col-sm-6 col-md-3">
                 <div class="card border-primary-subtle bg-primary-subtle text-center h-100 p-2">
@@ -99,7 +106,9 @@
             </div>
         </div>
 
+        <!-- บิลเคลียร์ตังค์ & Checklist -->
         <div class="row g-4 mb-4">
+            <!-- กล่องสรุปบิล -->
             <div class="col-12 col-md-6">
                 <div class="card bg-purple text-white h-100 shadow-sm p-4" style="background: linear-gradient(135deg, #6f42c1, #4f46e5);">
                     <h5 class="fw-bold"><i class="bi bi-wallet2 me-1"></i> สรุปบิลหารครึ่งประจำเดือน</h5>
@@ -109,6 +118,7 @@
                 </div>
             </div>
 
+            <!-- กล่อง Checklist -->
             <div class="col-12 col-md-6">
                 <div class="card bg-white h-100 shadow-sm p-4">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -120,6 +130,7 @@
             </div>
         </div>
 
+        <!-- เพิ่มภารกิจใหม่ หน้า Frontend -->
         <div class="card bg-white shadow-sm p-4 mb-4">
             <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-plus-circle me-1"></i> เพิ่มภารกิจการเงินใหม่เข้าเป้าหมายเดือนปัจจุบัน</h5>
             <div class="row g-3 align-items-end">
@@ -144,11 +155,13 @@
             </div>
         </div>
 
+        <!-- สัดส่วนรายจ่ายเยอะน้อย -->
         <div class="card bg-white shadow-sm p-4 mb-4">
             <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-bar-chart-line me-1"></i> สัดส่วนรายจ่ายเยอะ-น้อย</h5>
             <div id="analyticsArea" class="row g-3"></div>
         </div>
 
+        <!-- บันทึกรายการใหม่ (ดร็อปดาวน์จะล็อกค่าเลือกเจ้าของอัตโนมัติตามคนเข้าเว็บ!) -->
         <div id="recordBox" class="card bg-white shadow-sm p-4 mb-4 border-2 transition-all" style="border-color: transparent;">
             <h5 id="recordBoxTitle" class="fw-bold text-secondary mb-3">✍️ บันทึกรายการใหม่</h5>
             <input type="hidden" id="editTxId" value="">
@@ -163,16 +176,19 @@
                     <input type="text" id="txNote" placeholder="ระบุรายละเอียด หรือเหตุฉุกเฉิน" class="form-control">
                 </div>
                 <div class="col-12 col-md-4">
-                    <label for="txOwner" class="form-label small fw-medium text-muted mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน?</label>
-                    <select id="txOwner" class="form-select fw-medium">
-                        <option value="shared">🤝 ใช้ร่วมกัน (หารครึ่ง/กองกลาง)</option>
-                        <option value="me">🙋‍♂️ ของฉันคนเดียว</option>
-                        <option value="partner">🙋‍♀️ ของแฟนคนเดียว</option>
+                    <label for="txOwner" class="form-label small fw-medium text-muted mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน? (ระบบเลือกกระเป๋าที่เข้ามือให้แล้ว ⚡)</label>
+                    <select id="txOwner" class="form-select fw-bold border-indigo text-indigo">
+                        <!-- ค่าพวกนี้จะโดน JS ควบคุมสลับสับเปลี่ยนและ Default ออโต้ตามสิทธิ์การล็อกอินครับ -->
+                        <option value="shared-me">🤝 กองกลาง (ฉันควักจ่ายไปก่อน)</option>
+                        <option value="shared-partner">🤝 กองกลาง (แฟนควักจ่ายไปก่อน)</option>
+                        <option value="me">🙋‍♂️ ของฉันคนเดียว (เงินส่วนตัว)</option>
+                        <option value="partner">🙋‍♀️ ของแฟนคนเดียว (เงินส่วนตัว)</option>
                         <option value="emergency">🚨 ถอน/ฝาก เข้าเงินออมฉุกเฉิน</option>
                     </select>
                 </div>
             </div>
 
+            <!-- โหมดทำงานแก้ไขข้อมูลย้อนหลัง -->
             <div id="editActionArea" class="d-none alert alert-warning p-3 rounded-3 d-flex justify-content-between align-items-center">
                 <span class="small fw-bold text-warning-emphasis">⚠️ คุณกำลังดึงข้อมูลเก่าขึ้นมาเพื่อแก้ไขซ่อมแซม</span>
                 <div>
@@ -187,12 +203,13 @@
                     <div id="expenseButtons" class="d-flex flex-wrap gap-2"></div>
                 </div>
                 <div>
-                    <label class="form-label small INTEGRATION fw-bold text-success mb-2">🟢 เลือกหมวดหมู่รายรับ (คลิกเพื่อบันทึกทันที)</label>
+                    <label class="form-label small fw-bold text-success mb-2">🟢 เลือกหมวดหมู่รายรับ (คลิกเพื่อบันทึกทันที)</label>
                     <div id="incomeButtons" class="d-flex flex-wrap gap-2"></div>
                 </div>
             </div>
         </div>
 
+        <!-- ประวัติและตัวกรองข้อมูล -->
         <div class="card bg-white shadow-sm p-4 mb-4">
             <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-list-task me-1"></i> ประวัติรายการและตัวกรองข้อมูล</h5>
             
@@ -203,7 +220,7 @@
                         <option value="all">🌍 ทุกกระเป๋า / รวมทั้งหมด</option>
                         <option value="me">🙋‍♂️ เฉพาะของฉัน</option>
                         <option value="partner">🙋‍♀️ เฉพาะของแฟน</option>
-                        <option value="shared">🤝 เฉพาะส่วนกลาง</option>
+                        <option value="shared">🤝 เฉพาะส่วนกลางทั้งหมด</option>
                         <option value="emergency">🎯 เฉพาะเงินออมฉุกเฉิน</option>
                     </select>
                 </div>
@@ -245,14 +262,8 @@
     </div>
 
     <style>
-        .btn-indigo {
-            background-color: #4f46e5;
-            color: white;
-        }
-        .btn-indigo:hover {
-            background-color: #4338ca;
-            color: white;
-        }
+        .btn-indigo { background-color: #4f46e5; color: white; }
+        .btn-indigo:hover { background-color: #4338ca; color: white; }
     </style>
 </body>
 </html>

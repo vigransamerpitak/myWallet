@@ -1,8 +1,26 @@
-// app.js - Phase 1 Ultimate: รองรับ 4 กระเป๋า, แก้ไขข้อมูล, บันลึกเควสสำเร็จ/กากบาท, CRUD Checklist หน้าเว็บ
+// app.js - Ultimate AI Target Version: ตรวจจับสิทธิ์อัตโนมัติ ไม่ต้องเลือกคนจ่ายให้สับสน
 
 let filterOwner = 'all';
 let filterType = 'all';
 let filterDate = 'this-month';
+let currentUserRole = 'me'; // ค่าเริ่มต้น: me = ฉัน, partner = แฟน
+
+// 🛠️ 1. โค้ดลับดักจับอีเมลตอนล็อกอินสำเร็จเพื่อตั้งค่าหน้าตาแอปให้ตรงกับผู้ใช้งานจริง
+function initUserIdentity(userId) { // เปลี่ยนชื่อตัวแปรรับค่าเป็น userId
+    const userDisplay = document.getElementById('userDisplay');
+    const txOwnerInput = document.getElementById('txOwner');
+
+    // เอาเลข UID ยาวๆ จาก Supabase ของคุณมาวางแทนที่ตรงนี้เลยครับ
+    if (userId === '4ffee1dd-ff34-47c0-a623-7dcc76d80c0f') { 
+        currentUserRole = 'me';
+        userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">คุณเดฟ (แอดมิน)</span>`;
+        txOwnerInput.value = 'shared-me';
+    } else {
+        currentUserRole = 'partner';
+        userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">คุณแฟนคนสวย</span>`;
+        txOwnerInput.value = 'shared-partner';
+    }
+}
 
 window.onload = async function() {
     setTimeout(async () => {
@@ -21,7 +39,7 @@ async function updateFilters() {
     filterType = document.getElementById('filterType').value;
     filterDate = document.getElementById('filterDate').value;
     
-    await loadGoals(); 
+    await loadGoals();
     await loadTransactions();
 }
 
@@ -29,13 +47,8 @@ function showToast(message, icon = '✨') {
     const toast = document.getElementById('toastNotification');
     document.getElementById('toastIcon').innerText = icon;
     document.getElementById('toastMessage').innerText = message;
-    
-    // เปิดแสดงผลสไตล์ Bootstrap
     toast.classList.add('show');
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 2500);
+    setTimeout(() => { toast.classList.remove('show'); }, 2500);
 }
 
 async function loadCategories() {
@@ -63,8 +76,10 @@ async function saveTransaction(categoryName, type) {
     const amountInput = document.getElementById('txAmount');
     const noteInput = document.getElementById('txNote');
     const ownerInput = document.getElementById('txOwner');
-    const amount = parseFloat(amountInput.value);
+    
+    if (!ownerInput.value) return alert('กรุณาเลือกกระเป๋าเงินด้วยครับ');
 
+    const amount = parseFloat(amountInput.value);
     if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่');
     const finalAmount = parseFloat(amount.toFixed(2));
 
@@ -77,22 +92,24 @@ async function saveTransaction(categoryName, type) {
     } else {
         amountInput.value = '';
         noteInput.value = '';
+        
+        // 🛠️ ปรับปรุง: เมื่อกดบันทึกเงินเสร็จสิ้น ให้รีเซ็ตดรอปดาวน์กลับมาค้างไว้ที่สิทธิ์ของคนเข้าใช้งานคนนั้นออโต้ทันที ไม่ต้องให้ลืมเลือกใหม่
+        ownerInput.value = currentUserRole === 'me' ? 'shared-me' : 'shared-partner';
+        
         showToast('จดบันทึกเรียบร้อยแล้วจ้า! 💰', '✅');
         await loadTransactions();
     }
 }
 
-// ✏️ ระบบแก้ไขและลบประวัติรายการเงิน
 function enterEditMode(id, amount, note, owner) {
     document.getElementById('editTxId').value = id;
     document.getElementById('txAmount').value = parseFloat(amount).toFixed(2);
     document.getElementById('txNote').value = note || '';
     document.getElementById('txOwner').value = owner;
     
-    // ส่องไฟสีส้มสไตล์สว่างนวลของ Bootstrap 5
     const recordBox = document.getElementById('recordBox');
     recordBox.classList.remove('bg-white');
-    recordBox.style.backgroundColor = '#fff3cd'; // สีเหลือง Warning อ่อนๆ
+    recordBox.style.backgroundColor = '#fff3cd';
     recordBox.style.borderColor = '#ffc107';
     document.getElementById('recordBoxTitle').innerText = '✏️ แก้ไขข้อมูลรายการย้อนหลัง';
 
@@ -106,6 +123,9 @@ function cancelEditMode() {
     document.getElementById('editTxId').value = '';
     document.getElementById('txAmount').value = '';
     document.getElementById('txNote').value = '';
+    
+    // คืนค่าดรอปดาวน์กลับมาตามผู้ล็อกอินหลัก
+    document.getElementById('txOwner').value = currentUserRole === 'me' ? 'shared-me' : 'shared-partner';
     
     const recordBox = document.getElementById('recordBox');
     recordBox.style.backgroundColor = '#ffffff';
@@ -122,6 +142,7 @@ async function submitEditTransaction() {
     const note = document.getElementById('txNote').value.trim();
     const owner = document.getElementById('txOwner').value;
 
+    if (!owner) return alert('กรุณาเลือกกระเป๋าเงินด้วยครับ');
     if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกยอดเงินให้ถูกต้อง');
     const finalAmount = parseFloat(amount.toFixed(2));
 
@@ -142,7 +163,6 @@ async function deleteTransaction(id) {
     if (error) alert('ลบไม่สำเร็จ: ' + error.message); else { showToast('ลบรายการเงินทิ้งเรียบร้อย', '🗑️'); await loadTransactions(); }
 }
 
-// 🎯 🔥 ฟีเจอร์เฟส 1: เพิ่มภารกิจใหม่เข้าเดือนปัจจุบันแบบเรียลไทม์จากหน้าจอ
 async function createNewGoalFrontend() {
     const titleInput = document.getElementById('newGoalTitle');
     const amountInput = document.getElementById('newGoalAmount');
@@ -169,7 +189,6 @@ async function createNewGoalFrontend() {
     }
 }
 
-// 🎯 🔥 ระบบโหลดเควสย้อนหลัง และจัดการติ๊กถูก/กากบาท
 async function loadGoals() {
     const now = new Date();
     let targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -188,14 +207,13 @@ async function loadGoals() {
 
     if (error) return console.error(error);
 
-    // ระบบโคลนเควสกรณีขึ้นเดือนใหม่แล้วยังว่างเปล่า
     if (goals.length === 0 && filterDate !== 'all') {
         const defaultGoals = [
             { title: 'ออมเงินกองกลางไปเที่ยวญี่ปุ่น', amount: 2000, type: 'save', goal_month: targetMonthStr },
             { title: 'จ่ายค่าส่วนกลางคอนโด', amount: 1500, type: 'bill', goal_month: targetMonthStr },
             { title: 'หยอดกระปุกสำรองฉุกเฉินเพิ่ม', amount: 1000, type: 'save', goal_month: targetMonthStr }
         ];
-        const { data: insertedData, error: insertError } = await supabaseClient.from('goals').insert(defaultGoals).select();
+        const { data: insertedData, error: insertError = null } = await supabaseClient.from('goals').insert(defaultGoals).select();
         if (!insertError) { goals = insertedData; showToast(`สร้าง Checklist เดือน ${targetMonthStr} ออโต้จ้า!`, '🎉'); }
     }
 
@@ -209,31 +227,37 @@ async function loadGoals() {
 
     goals.forEach(goal => {
         const div = document.createElement('div');
-        div.className = "flex items-center justify-between p-2 rounded-lg border border-gray-100 bg-gray-50 text-xs";
+        div.className = "list-group-item d-flex justify-content-between align-items-center p-2 mb-1 bg-light rounded border text-sm";
         
-        // 🎨 ออกแบบปุ่มติ๊กถูก / กากบาท และล็อกประวัติย้อนหลังถ้าตัดสินใจสถานะไปแล้ว
         let actionUI = '';
         if (goal.is_completed) {
-            actionUI = `<span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">✅ สำเร็จ</span>`;
-        } else if (goal.is_failed) {
-            actionUI = `<span class="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md border border-red-200">❌ ล้มเหลว</span>`;
-        } else {
-            // เควสที่ยังว่างอยู่ -> เปิดปุ่มให้เลือกว่าจะ ติ๊กถูก หรือ กากบาท
             actionUI = `
-                <div class="space-x-1 whitespace-nowrap">
-                    <button onclick="settleGoal(${goal.id}, 'success', '${goal.title}', ${goal.amount}, '${goal.type}')" class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium hover:bg-emerald-100 cursor-pointer">✅ ออมแล้ว</button>
-                    <button onclick="settleGoal(${goal.id}, 'failed', '${goal.title}', ${goal.amount}, '${goal.type}')" class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded font-medium hover:bg-red-100 cursor-pointer">❌ ข้าม</button>
-                    <button onclick="deleteGoalFrontend(${goal.id})" class="text-gray-400 hover:text-black font-bold ml-1 text-xs cursor-pointer" title="ลบเควสนี้ทิ้ง">🗑️</button>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-success">✅ สำเร็จ</span>
+                    <button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm p-0 px-1 text-xs cursor-pointer" title="ย้อนคืนสถานะภารกิจ">↩️ รีเซ็ต</button>
+                </div>`;
+        } else if (goal.is_failed) {
+            actionUI = `
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-danger">❌ ล้มเหลว</span>
+                    <button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm p-0 px-1 text-xs cursor-pointer" title="ย้อนคืนสถานะภารกิจ">↩️ รีเซ็ต</button>
+                </div>`;
+        } else {
+            actionUI = `
+                <div class="btn-group btn-group-sm">
+                    <button onclick="settleGoal(${goal.id}, 'success', '${goal.title}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-success py-0.5 px-2 cursor-pointer">✅ ออมแล้ว</button>
+                    <button onclick="settleGoal(${goal.id}, 'failed', '${goal.title}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-danger py-0.5 px-2 cursor-pointer">❌ ข้าม</button>
+                    <button onclick="deleteGoalFrontend(${goal.id})" class="btn btn-link text-muted p-0 px-1 ms-1 text-xs cursor-pointer" title="ลบถาวร">🗑️</button>
                 </div>
             `;
         }
 
         div.innerHTML = `
-            <div class="flex items-center gap-1.5 truncate">
-                <span class="${goal.is_completed ? 'line-through text-gray-400' : goal.is_failed ? 'line-through text-gray-300' : 'font-semibold text-gray-700'}">${goal.type === 'save' ? '🎯' : '📄'} ${goal.title}</span>
+            <div class="text-truncate me-2">
+                <span class="${goal.is_completed ? 'text-decoration-line-through text-muted' : goal.is_failed ? 'text-decoration-line-through text-black-50' : 'fw-semibold text-dark'}">${goal.type === 'save' ? '🎯' : '📄'} ${goal.title}</span>
             </div>
-            <div class="flex items-center gap-3 shrink-0">
-                <span class="font-bold text-gray-800">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>
+            <div class="d-flex align-items-center gap-2 shrink-0">
+                <span class="fw-bold text-dark">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>
                 ${actionUI}
             </div>
         `;
@@ -241,25 +265,28 @@ async function loadGoals() {
     });
 }
 
-// 🔥 ระบบประมวลผลการกดปุ่ม "ออมแล้ว" หรือ "ข้าม (กากบาท)"
 async function settleGoal(id, status, title, amount, type) {
     if (status === 'success') {
-        if (!confirm(`ยืนยันทำเควสสำเร็จ: "${title}"?\nระบบจะล็อกยอดโอนเงินเข้าบัญชีให้ทันที`)) return;
+        if (!confirm(`ยืนยันทำเควสสำเร็จ: "${title}"?\nระบบจะสร้างธุรกรรมออม/จ่ายเงินให้อัตโนมัติ`)) return;
         
-        const { error } = await supabaseClient.from('goals').update({ is_completed: true }).eq('id', id);
+        const { error } = await supabaseClient.from('goals').update({ is_completed: true, is_failed: false }).eq('id', id);
         if (error) return alert(error.message);
 
         const finalAmount = parseFloat(parseFloat(amount).toFixed(2));
+        
+        // ผูกสิทธิ์ออโต้ตามคนกดเควส Checklist (แก้ปัญหาใครควักออมก่อน)
+        const currentSharedOwner = currentUserRole === 'me' ? 'shared-me' : 'shared-partner';
+
         if (type === 'save') {
             await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]);
             showToast('ย้ายเงินเข้าบัญชีฉุกเฉินแล้ว 🎯', '🎉');
         } else {
-            await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: `จ่ายบิลออโต้: ${title}` }]);
+            await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: currentSharedOwner, note: `จ่ายบิลออโต้: ${title}` }]);
             showToast('ตัดยอดบิลส่วนกลางเรียบร้อย 📄', '✅');
         }
     } else {
-        if (!confirm(`เดือนนี้ไม่ได้ออม/ไม่ได้จ่ายรายการ: "${title}" ใช่ไหม?\nระบบจะขึ้นเครื่องหมายกากบาทเป็นประวัติความล้มเหลวไว้ครับ`)) return;
-        const { error } = await supabaseClient.from('goals').update({ is_failed: true }).eq('id', id);
+        if (!confirm(`เดือนนี้ล้มเหลว/ข้ามภารกิจ: "${title}" ใช่ไหม?`)) return;
+        const { error } = await supabaseClient.from('goals').update({ is_completed: false, is_failed: true }).eq('id', id);
         if (error) return alert(error.message);
         showToast('บันทึกสถิติข้ามเควสแล้ว ❌', '📁');
     }
@@ -268,7 +295,16 @@ async function settleGoal(id, status, title, amount, type) {
     await loadTransactions();
 }
 
-// 🔥 ปุ่มกดลบเควสออกจากตารางหน้าบ้านตรงๆ
+async function resetGoalStatus(id, title) {
+    if (!confirm(`คุณต้องการยกเลิกสถานะของภารกิจ "${title}" เพื่อกลับไปเลือกกดติ๊กถูก/กากบาทใหม่ ใช่หรือไม่?`)) return;
+    
+    const { error } = await supabaseClient.from('goals').update({ is_completed: false, is_failed: false }).eq('id', id);
+    if (error) return alert(error.message);
+    
+    showToast('รีเซ็ตสถานะภารกิจกลับคืนเรียบร้อย', '↩️');
+    await loadGoals();
+}
+
 async function deleteGoalFrontend(id) {
     if (!confirm('ต้องการลบภารกิจนี้ออกจากหน้าจอใช่ไหมครับ?')) return;
     const { error } = await supabaseClient.from('goals').delete().eq('id', id);
@@ -283,6 +319,8 @@ async function loadTransactions() {
     tbody.innerHTML = '';
 
     let myTotal = 0; let partnerTotal = 0; let sharedTotal = 0; let emergencyTotal = 0;
+    let totalMePaidShared = 0; let totalPartnerPaidShared = 0;
+
     let categorySummary = {}; let totalExpenseFiltered = 0;
     const now = new Date(); const thisMonth = now.getMonth(); const thisYear = now.getFullYear();
 
@@ -293,45 +331,63 @@ async function loadTransactions() {
 
         if (tx.owner === 'me') myTotal += value;
         else if (tx.owner === 'partner') partnerTotal += value;
-        else if (tx.owner === 'shared') sharedTotal += value;
         else if (tx.owner === 'emergency') emergencyTotal += value;
+        else if (tx.owner === 'shared' || tx.owner === 'shared-me' || tx.owner === 'shared-partner') {
+            sharedTotal += value;
+        }
 
+        let isCurrentFilterMonth = false;
         if (filterDate === 'this-month') {
             if (txDate.getMonth() !== thisMonth || txDate.getFullYear() !== thisYear) return;
+            isCurrentFilterMonth = true;
         } else if (filterDate === 'last-month') {
             let targetMonth = thisMonth - 1; let targetYear = thisYear;
             if (targetMonth < 0) { targetMonth = 11; targetYear--; }
             if (txDate.getMonth() !== targetMonth || txDate.getFullYear() !== targetYear) return;
+            isCurrentFilterMonth = true;
+        } else {
+            isCurrentFilterMonth = true;
         }
 
-        if (tx.type === 'expense') {
+        if (isCurrentFilterMonth && tx.type === 'expense') {
+            if (tx.owner === 'shared-me') totalMePaidShared += txAmount;
+            if (tx.owner === 'shared-partner') totalPartnerPaidShared += txAmount;
+        }
+
+        if (isCurrentFilterMonth && tx.type === 'expense') {
             if (!categorySummary[tx.category_name]) categorySummary[tx.category_name] = 0;
             categorySummary[tx.category_name] += txAmount;
             totalExpenseFiltered += txAmount;
         }
 
-        if (filterOwner !== 'all' && tx.owner !== filterOwner) return;
+        if (filterOwner !== 'all') {
+            if (filterOwner === 'shared' && !(tx.owner === 'shared' || tx.owner === 'shared-me' || tx.owner === 'shared-partner')) return;
+            if (filterOwner === 'me' && tx.owner !== 'me') return;
+            if (filterOwner === 'partner' && tx.owner !== 'partner') return;
+            if (filterOwner === 'emergency' && tx.owner !== 'emergency') return;
+        }
         if (filterType !== 'all' && tx.type !== filterType) return;
 
         let ownerBadge = '';
-        if (tx.owner === 'me') ownerBadge = '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">🙋‍♂️ ฉัน</span>';
-        else if (tx.owner === 'partner') ownerBadge = '<span class="bg-pink-100 text-pink-800 text-xs px-2 py-0.5 rounded-full">🙋‍♀️ แฟน</span>';
-        else if (tx.owner === 'shared') ownerBadge = '<span class="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-full">🤝 ส่วนกลาง</span>';
-        else ownerBadge = '<span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full">🎯 ออมฉุกเฉิน</span>';
+        if (tx.owner === 'me') ownerBadge = '<span class="badge bg-primary-subtle text-primary">🙋‍♂️ ฉัน</span>';
+        else if (tx.owner === 'partner') ownerBadge = '<span class="badge bg-danger-subtle text-danger">🙋‍♀️ แฟน</span>';
+        else if (tx.owner === 'emergency') ownerBadge = '<span class="badge bg-success text-white">🎯 ออมฉุกเฉิน</span>';
+        else if (tx.owner === 'shared-me') ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง (ฉันจ่าย)</span>';
+        else if (tx.owner === 'shared-partner') ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง (แฟนจ่าย)</span>';
+        else ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง</span>';
 
         const dateStr = txDate.toLocaleString('th-TH', { hour12: false });
         const row = document.createElement('tr');
-        row.className = "text-sm";
         row.innerHTML = `
-            <td class="py-2.5 text-gray-400">${dateStr}</td>
-            <td class="py-2.5">${ownerBadge}</td>
-            <td class="py-2.5 font-medium ${tx.type === 'expense' ? 'text-red-500' : 'text-green-500'}">${tx.type === 'expense' ? 'รายจ่าย 🔴' : 'รายรับ 🟢'}</td>
-            <td class="py-2.5 font-medium">${tx.category_name}</td>
-            <td class="py-2.5 font-bold">${txAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</td>
-            <td class="py-2.5 text-gray-500 text-xs">${tx.note || '-'}</td>
-            <td class="py-2.5 text-center space-x-1 whitespace-nowrap">
-                <button onclick="enterEditMode(${tx.id}, ${txAmount}, '${tx.note || ''}', '${tx.owner}')" class="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-1 rounded hover:bg-yellow-100 cursor-pointer">✏️ แก้</button>
-                <button onclick="deleteTransaction(${tx.id})" class="text-xs bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded hover:bg-red-100 cursor-pointer">🗑️ ลบ</button>
+            <td class="small text-muted">${dateStr}</td>
+            <td>${ownerBadge}</td>
+            <td class="fw-medium ${tx.type === 'expense' ? 'text-danger' : 'text-success'}">${tx.type === 'expense' ? 'รายจ่าย 🔴' : 'รายรับ 🟢'}</td>
+            <td class="fw-semibold">${tx.category_name}</td>
+            <td class="fw-bold">${txAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</td>
+            <td class="text-muted small">${tx.note || '-'}</td>
+            <td class="text-center whitespace-nowrap">
+                <button onclick="enterEditMode(${tx.id}, ${txAmount}, '${tx.note || ''}', '${tx.owner}')" class="btn btn-outline-warning btn-sm py-0 px-2 cursor-pointer">✏️ แก้</button>
+                <button onclick="deleteTransaction(${tx.id})" class="btn btn-outline-danger btn-sm py-0 px-2 cursor-pointer">🗑️ ลบ</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -342,13 +398,34 @@ async function loadTransactions() {
     document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
     document.getElementById('emergencyTotal').innerText = `${emergencyTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
 
-    const totalSharedExpense = Math.abs(sharedTotal);
-    const halfBill = totalSharedExpense / 2;
+    const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared;
     const billTextEl = document.getElementById('billSummaryText');
-    if (totalSharedExpense === 0) {
-        billTextEl.innerText = "🎉 ยอดส่วนกลางเจ๊ากันพอดี ไม่มีใครค้างตังค์ใครครับ";
+
+    if (grandSharedExpense === 0) {
+        billTextEl.innerText = "🎉 ยอดส่วนกลางประจำช่วงเวลานี้เจ๊ากันพอดี ไม่มีใครค้างตังค์ใครครับ";
     } else {
-        billTextEl.innerHTML = `รายจ่ายกองกลางรวมสะสม: <span class="font-bold underline text-yellow-300">${totalSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span><br><span class="text-xs text-purple-100">เฉลี่ยควักเนื้อกระเป๋าคนละ: ${halfBill.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท เพื่อให้กองกลางสมดุลครับ 👩‍❤️‍👨</span>`;
+        const halfShare = grandSharedExpense / 2;
+        let settlementResultText = "";
+
+        if (totalMePaidShared > totalPartnerPaidShared) {
+            const diff = totalMePaidShared - halfShare;
+            settlementResultText = `🙋‍♀️ แฟนต้องโอนคืนให้คุณ: <span class="fw-bold underline text-white fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
+        } else if (totalPartnerPaidShared > totalMePaidShared) {
+            const diff = totalPartnerPaidShared - halfShare;
+            settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold underline text-danger-emphasis fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
+        } else {
+            settlementResultText = `🤝 ยอดออกเงินคนละครึ่งเท่ากันเป๊ะ พอดิบพอดีจ้า!`;
+        }
+
+        billTextEl.innerHTML = `
+            รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br>
+            <div class="text-start mt-2 small text-white-50">
+                • คุณควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ.<br>
+                • แฟนควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.
+            </div>
+            <hr class="my-2 text-white-50">
+            ${settlementResultText}
+        `;
     }
 
     renderAnalytics(categorySummary, totalExpenseFiltered);
@@ -359,17 +436,24 @@ function renderAnalytics(summary, total) {
     const sortedCats = Object.keys(summary).map(name => ({ name: name, amount: summary[name] })).sort((a, b) => b.amount - a.amount);
 
     if (sortedCats.length === 0) {
-        area.innerHTML = '<p class="text-sm text-gray-400 col-span-2 text-center py-4">❌ ไม่พบข้อมูลรายจ่ายในรอบเดือนนี้</p>';
+        area.innerHTML = '<p class="text-center text-muted py-3">❌ ไม่พบข้อมูลรายจ่ายในรอบเดือนนี้</p>';
         return;
     }
     sortedCats.forEach(item => {
         const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0;
-        const card = document.createElement('div');
-        card.className = "bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1";
-        card.innerHTML = `
-            <div class="flex justify-between text-xs font-medium"><span class="text-gray-700">🛒 ${item.name}</span><span class="text-gray-900 font-bold">${item.amount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ. (${percentage}%)</span></div>
-            <div class="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden"><div class="bg-red-500 h-full" style="width: ${percentage}%"></div></div>
+        const col = document.createElement('div');
+        col.className = "col-12 col-md-6";
+        col.innerHTML = `
+            <div class="bg-light p-3 rounded-3 border">
+                <div class="d-flex justify-content-between small fw-bold mb-1">
+                    <span class="text-dark">🛒 ${item.name}</span>
+                    <span class="text-secondary">${item.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ. (${percentage}%)</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-danger" style="width: ${percentage}%"></div>
+                </div>
+            </div>
         `;
-        area.appendChild(card);
+        area.appendChild(col);
     });
 }
