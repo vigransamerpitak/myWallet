@@ -30,12 +30,11 @@ function showToast(message, icon = '✨') {
     document.getElementById('toastIcon').innerText = icon;
     document.getElementById('toastMessage').innerText = message;
     
-    toast.classList.remove('translate-y-20', 'opacity-0');
-    toast.classList.add('translate-y-0', 'opacity-100');
+    // เปิดแสดงผลสไตล์ Bootstrap
+    toast.classList.add('show');
 
     setTimeout(() => {
-        toast.classList.remove('translate-y-0', 'opacity-100');
-        toast.classList.add('translate-y-20', 'opacity-0');
+        toast.classList.remove('show');
     }, 2500);
 }
 
@@ -90,13 +89,15 @@ function enterEditMode(id, amount, note, owner) {
     document.getElementById('txNote').value = note || '';
     document.getElementById('txOwner').value = owner;
     
+    // ส่องไฟสีส้มสไตล์สว่างนวลของ Bootstrap 5
     const recordBox = document.getElementById('recordBox');
-    recordBox.classList.remove('bg-white', 'border-transparent');
-    recordBox.classList.add('bg-yellow-50/50', 'border-yellow-400');
+    recordBox.classList.remove('bg-white');
+    recordBox.style.backgroundColor = '#fff3cd'; // สีเหลือง Warning อ่อนๆ
+    recordBox.style.borderColor = '#ffc107';
     document.getElementById('recordBoxTitle').innerText = '✏️ แก้ไขข้อมูลรายการย้อนหลัง';
 
-    document.getElementById('categoryActionArea').classList.add('hidden');
-    document.getElementById('editActionArea').classList.remove('hidden');
+    document.getElementById('categoryActionArea').classList.add('d-none');
+    document.getElementById('editActionArea').classList.remove('d-none');
     
     window.scrollTo({ top: 100, behavior: 'smooth' });
 }
@@ -107,12 +108,12 @@ function cancelEditMode() {
     document.getElementById('txNote').value = '';
     
     const recordBox = document.getElementById('recordBox');
-    recordBox.classList.remove('bg-yellow-50/50', 'border-yellow-400');
-    recordBox.classList.add('bg-white', 'border-transparent');
+    recordBox.style.backgroundColor = '#ffffff';
+    recordBox.style.borderColor = 'transparent';
     document.getElementById('recordBoxTitle').innerText = '✍️ บันทึกรายการใหม่';
 
-    document.getElementById('categoryActionArea').classList.remove('hidden');
-    document.getElementById('editActionArea').classList.add('hidden');
+    document.getElementById('categoryActionArea').classList.remove('d-none');
+    document.getElementById('editActionArea').classList.add('d-none');
 }
 
 async function submitEditTransaction() {

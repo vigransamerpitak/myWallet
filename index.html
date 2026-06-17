@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบคู่รักนักออม - Super PWA & CRUD Version</title>
+    <title>ระบบคู่รักนักออม - Bootstrap 5 Version</title>
     <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
@@ -19,116 +21,150 @@
         }
         checkUserAuth();
 
-        // 🚀 สคริปต์เปิดการทำงาน PWA ให้ระบบสามารถกดติดตั้งลงบนจอมือถือได้
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js')
-                .then(() => console.log('PWA Service Worker Registered!'));
+                .then(() => console.log('PWA Registered!'));
         }
     </script>
+    <style>
+        /* ตกแต่ง Toast เพิ่มเติมให้อยู่เหนือทุกสิ่ง */
+        #toastNotification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1050;
+            transition: all 0.3s ease-in-out;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        #toastNotification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .cursor-pointer { cursor: pointer; }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 md:p-8 relative">
+<body class="bg-light pdf-4 py-5">
 
-    <!-- 🍞 กล่อง Toast แจ้งเตือนสถานะมุมจอ -->
-    <div id="toastNotification" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 transition-all duration-300 z-50 pointer-events-none">
-        <span id="toastIcon">✨</span>
-        <span id="toastMessage" class="text-sm font-medium">ทำรายการสำเร็จ!</span>
+    <div id="toastNotification" class="toast align-items-center text-white bg-dark border-0 p-2 d-flex shadow" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex w-full">
+            <div class="toast-body">
+                <span id="toastIcon" class="me-2">✨</span>
+                <span id="toastMessage">ทำรายการสำเร็จ!</span>
+            </div>
+        </div>
     </div>
 
-    <div class="max-w-4xl mx-auto space-y-6">
-        <!-- แถบผู้ใช้ -->
-        <div class="flex justify-between items-center bg-white px-6 py-3 rounded-xl shadow-sm">
-            <span id="userDisplay" class="text-sm font-medium text-gray-600">กำลังตรวจสอบ...</span>
-            <button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-red-100 hover:text-red-700 transition cursor-pointer">🚪 ออกจากระบบ</button>
+    <div class="container" style="max-width: 900px;">
+        
+        <div class="d-flex justify-content-between align-items-center bg-white p-3 rounded-3 shadow-sm mb-4">
+            <span id="userDisplay" class="fw-medium text-secondary">กำลังตรวจสอบ...</span>
+            <button onclick="handleLogout()" class="btn btn-outline-secondary btn-sm">🚪 ออกจากระบบ</button>
         </div>
 
-        <h1 class="text-3xl font-bold text-center text-gray-800">👩‍❤️‍👨 บันทึกรายรับ-รายจ่ายคู่รัก</h1>
+        <h1 class="text-center fw-bold text-dark mb-4">👩‍❤️‍👨 บันทึกรายรับ-รายจ่ายคู่รัก</h1>
 
-        <!-- 📊 สรุปภาพรวมกระเป๋าเงิน 4 กล่อง -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl shadow-sm text-center">
-                <p class="text-xs font-semibold text-blue-600">กระเป๋าของฉัน 🙋‍♂️</p>
-                <p id="myTotal" class="text-xl font-bold text-blue-800">0.00 บาท</p>
-            </div>
-            <div class="bg-pink-50 border border-pink-200 p-4 rounded-2xl shadow-sm text-center">
-                <p class="text-xs font-semibold text-pink-600">กระเป๋าของแฟน 🙋‍♀️</p>
-                <p id="partnerTotal" class="text-xl font-bold text-pink-800">0.00 บาท</p>
-            </div>
-            <div class="bg-purple-50 border border-purple-200 p-4 rounded-2xl shadow-sm text-center">
-                <p class="text-xs font-semibold text-purple-600">เงินกองกลางร่วมกัน 🤝</p>
-                <p id="sharedTotal" class="text-xl font-bold text-purple-800">0.00 บาท</p>
-            </div>
-            <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm text-center ring-2 ring-emerald-400/30">
-                <p class="text-xs font-semibold text-emerald-600">เงินออมสำรองฉุกเฉิน 🎯</p>
-                <p id="emergencyTotal" class="text-xl font-bold text-emerald-800">0.00 บาท</p>
-            </div>
-        </div>
-
-        <!-- บิลเคลียร์ตังค์ & 🎯 Checklist การเงินแบบอัปเกรด (มีปุ่มกากบาทด้วย) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-6 rounded-2xl shadow-md space-y-3">
-                <h2 class="text-base font-bold flex items-center gap-1">🤝 สรุปบิลหารครึ่งประจำเดือน</h2>
-                <div class="bg-white/10 p-4 rounded-xl backdrop-blur-xs">
-                    <p id="billSummaryText" class="text-sm font-semibold text-center">กำลังคำนวณยอดบิล...</p>
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="card border-primary-subtle bg-primary-subtle text-center h-100 p-2">
+                    <div class="card-body">
+                        <p class="small fw-bold text-primary mb-1">กระเป๋าของฉัน 🙋‍♂️</p>
+                        <h4 id="myTotal" class="fw-bold text-primary-emphasis mb-0">0.00 บาท</h4>
+                    </div>
                 </div>
             </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm space-y-3">
-                <h2 class="text-base font-bold text-gray-700 flex justify-between items-center">
-                    <span>🎯 Checklist ภารกิจการเงิน</span>
-                    <span id="checklistMonthLabel" class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md"></span>
-                </h2>
-                <div id="goalsList" class="space-y-2 max-h-[160px] overflow-y-auto pr-1"></div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="card border-danger-subtle bg-danger-subtle text-center h-100 p-2">
+                    <div class="card-body">
+                        <p class="small fw-bold text-danger mb-1">กระเป๋าของแฟน 🙋‍♀️</p>
+                        <h4 id="partnerTotal" class="fw-bold text-danger-emphasis mb-0">0.00 บาท</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="card border-warning-subtle bg-warning-subtle text-center h-100 p-2">
+                    <div class="card-body">
+                        <p class="small fw-bold text-warning-emphasis mb-1">เงินกองกลางร่วมกัน 🤝</p>
+                        <h4 id="sharedTotal" class="fw-bold text-warning-emphasis mb-0">0.00 บาท</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="card border-success border-2 bg-success-subtle text-center h-100 p-2 shadow-sm">
+                    <div class="card-body">
+                        <p class="small fw-bold text-success mb-1">เงินออมสำรองฉุกเฉิน 🎯</p>
+                        <h4 id="emergencyTotal" class="fw-bold text-success-emphasis mb-0">0.00 บาท</h4>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- 🔥 ส่วนเพิ่มใหม่เฟส 1: ระบบเพิ่ม/จัดการ Checklist หน้าบ้านร่วมกันโดยตรง -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-3">
-            <h2 class="text-lg font-semibold text-gray-700">➕ เพิ่มเควส/ภารกิจการเงินใหม่เข้าเป้าหมายเดือนปัจจุบัน</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                <div class="w-full">
-                    <label for="newGoalTitle" class="block text-xs font-medium text-gray-600 mb-1">ชื่อภารกิจ (เช่น ค่าช้อปปิ้งของบ้าน)</label>
-                    <input type="text" id="newGoalTitle" placeholder="ระบุชื่อเควสประจำเดือน" class="w-full text-sm border border-gray-300 rounded-lg p-2 outline-none">
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-md-6">
+                <div class="card bg-purple text-white h-100 shadow-sm p-4" style="background: linear-gradient(135deg, #6f42c1, #4f46e5);">
+                    <h5 class="fw-bold"><i class="bi bi-wallet2 me-1"></i> สรุปบิลหารครึ่งประจำเดือน</h5>
+                    <div class="p-3 bg-white bg-opacity-10 rounded-3 mt-3">
+                        <p id="billSummaryText" class="small fw-medium text-center mb-0">กำลังคำนวณยอดบิล...</p>
+                    </div>
                 </div>
-                <div class="w-full">
-                    <label for="newGoalAmount" class="block text-xs font-medium text-gray-600 mb-1">เป้าหมายยอดเงิน (บาท)</label>
-                    <input type="number" id="newGoalAmount" placeholder="0.00" class="w-full text-sm border border-gray-300 rounded-lg p-2 outline-none">
+            </div>
+
+            <div class="col-12 col-md-6">
+                <div class="card bg-white h-100 shadow-sm p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="fw-bold text-secondary mb-0">🎯 Checklist ภารกิจการเงิน</h5>
+                        <span id="checklistMonthLabel" class="badge bg-light text-dark border"></span>
+                    </div>
+                    <div id="goalsList" class="overflow-y-auto pe-1" style="max-height: 150px;"></div>
                 </div>
-                <div class="w-full">
-                    <label for="newGoalType" class="block text-xs font-medium text-gray-600 mb-1">ประเภทเควส</label>
-                    <select id="newGoalType" title="ประเภทเควส" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white outline-none">
+            </div>
+        </div>
+
+        <div class="card bg-white shadow-sm p-4 mb-4">
+            <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-plus-circle me-1"></i> เพิ่มภารกิจการเงินใหม่เข้าเป้าหมายเดือนปัจจุบัน</h5>
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label for="newGoalTitle" class="form-label small fw-semibold text-muted mb-1">ชื่อภารกิจ</label>
+                    <input type="text" id="newGoalTitle" placeholder="ระบุชื่อเควสประจำเดือน" class="form-control">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="newGoalAmount" class="form-label small fw-semibold text-muted mb-1">เป้าหมายยอดเงิน (บาท)</label>
+                    <input type="number" id="newGoalAmount" placeholder="0.00" class="form-control">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="newGoalType" class="form-label small fw-semibold text-muted mb-1">ประเภทเควส</label>
+                    <select id="newGoalType" class="form-select">
                         <option value="save">🎯 ภารกิจ [ออมเงินเข้าคลังฉุกเฉิน]</option>
                         <option value="bill">📄 ภารกิจ [บิลรายจ่ายส่วนกลางประจำ]</option>
                     </select>
                 </div>
             </div>
-            <div class="flex justify-end pt-1">
-                <button onclick="createNewGoalFrontend()" class="w-full sm:w-auto bg-indigo-600 text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-indigo-700 transition cursor-pointer">➕ เพิ่มภารกิจลงหน้าจอ</button>
+            <div class="d-flex justify-content-end mt-3">
+                <button onclick="createNewGoalFrontend()" class="btn btn-indigo px-4">➕ เพิ่มภารกิจลงหน้าจอ</button>
             </div>
         </div>
 
-        <!-- สัดส่วนรายจ่ายเยอะน้อย -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-            <h2 class="text-xl font-semibold text-gray-700">📊 สัดส่วนรายจ่ายเยอะ-น้อย</h2>
-            <div id="analyticsArea" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        <div class="card bg-white shadow-sm p-4 mb-4">
+            <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-bar-chart-line me-1"></i> สัดส่วนรายจ่ายเยอะ-น้อย</h5>
+            <div id="analyticsArea" class="row g-3"></div>
         </div>
 
-        <!-- บันทึกรายการใหม่ -->
-        <div id="recordBox" class="bg-white p-6 rounded-2xl shadow-sm space-y-4 border-2 border-transparent transition-all duration-300">
-            <h2 id="recordBoxTitle" class="text-xl font-semibold text-gray-700">✍️ บันทึกรายการใหม่</h2>
+        <div id="recordBox" class="card bg-white shadow-sm p-4 mb-4 border-2 transition-all" style="border-color: transparent;">
+            <h5 id="recordBoxTitle" class="fw-bold text-secondary mb-3">✍️ บันทึกรายการใหม่</h5>
             <input type="hidden" id="editTxId" value="">
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="w-full">
-                    <label for="txAmount" class="block text-sm font-medium text-gray-600 mb-1">จำนวนเงิน (บาท)</label>
-                    <input type="number" id="txAmount" step="0.01" inputmode="decimal" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-4">
+                    <label for="txAmount" class="form-label small fw-medium text-muted mb-1">จำนวนเงิน (บาท)</label>
+                    <input type="number" id="txAmount" step="0.01" inputmode="decimal" placeholder="0.00" class="form-control">
                 </div>
-                <div class="w-full">
-                    <label for="txNote" class="block text-sm font-medium text-gray-600 mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
-                    <input type="text" id="txNote" placeholder="ระบุรายละเอียด หรือเหตุฉุกเฉิน" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                <div class="col-12 col-md-4">
+                    <label for="txNote" class="form-label small fw-medium text-muted mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
+                    <input type="text" id="txNote" placeholder="ระบุรายละเอียด หรือเหตุฉุกเฉิน" class="form-control">
                 </div>
-                <div class="w-full">
-                    <label for="txOwner" class="block text-sm font-medium text-gray-600 mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน?</label>
-                    <select id="txOwner" title="เลือกกระเป๋าเงิน" class="w-full border border-gray-300 rounded-lg p-2 outline-none bg-white font-medium">
+                <div class="col-12 col-md-4">
+                    <label for="txOwner" class="form-label small fw-medium text-muted mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน?</label>
+                    <select id="txOwner" class="form-select fw-medium">
                         <option value="shared">🤝 ใช้ร่วมกัน (หารครึ่ง/กองกลาง)</option>
                         <option value="me">🙋‍♂️ ของฉันคนเดียว</option>
                         <option value="partner">🙋‍♀️ ของแฟนคนเดียว</option>
@@ -137,35 +173,33 @@
                 </div>
             </div>
 
-            <!-- โหมดทำงานแก้ไขข้อมูลย้อนหลัง -->
-            <div id="editActionArea" class="hidden bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-center">
-                <span class="text-sm font-semibold text-yellow-800">⚠️ คุณกำลังดึงข้อมูลเก่าขึ้นมาเพื่อแก้ไขซ่อมแซม</span>
-                <div class="space-x-2">
-                    <button onclick="cancelEditMode()" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md text-sm cursor-pointer">ยกเลิก</button>
-                    <button onclick="submitEditTransaction()" class="px-4 py-1 bg-yellow-600 text-white rounded-md text-sm font-medium hover:bg-yellow-700 cursor-pointer">💾 บันทึกการแก้ไข</button>
+            <div id="editActionArea" class="d-none alert alert-warning p-3 rounded-3 d-flex justify-content-between align-items-center">
+                <span class="small fw-bold text-warning-emphasis">⚠️ คุณกำลังดึงข้อมูลเก่าขึ้นมาเพื่อแก้ไขซ่อมแซม</span>
+                <div>
+                    <button onclick="cancelEditMode()" class="btn btn-light btn-sm me-2">ยกเลิก</button>
+                    <button onclick="submitEditTransaction()" class="btn btn-warning btn-sm text-dark fw-medium">💾 บันทึกการแก้ไข</button>
                 </div>
             </div>
 
             <div id="categoryActionArea">
-                <div>
-                    <label class="block text-sm font-medium text-red-600 mb-2">🔴 เลือกหมวดหมู่รายจ่าย (คลิกเพื่อบันทึกทันที)</label>
-                    <div id="expenseButtons" class="flex flex-wrap gap-2"></div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-danger mb-2">🔴 เลือกหมวดหมู่รายจ่าย (คลิกเพื่อบันทึกทันที)</label>
+                    <div id="expenseButtons" class="d-flex flex-wrap gap-2"></div>
                 </div>
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-green-600 mb-2">🟢 เลือกหมวดหมู่รายรับ (คลิกเพื่อบันทึกทันที)</label>
-                    <div id="incomeButtons" class="flex flex-wrap gap-2"></div>
+                <div>
+                    <label class="form-label small INTEGRATION fw-bold text-success mb-2">🟢 เลือกหมวดหมู่รายรับ (คลิกเพื่อบันทึกทันที)</label>
+                    <div id="incomeButtons" class="d-flex flex-wrap gap-2"></div>
                 </div>
             </div>
         </div>
 
-        <!-- ประวัติและตัวกรองข้อมูลละเอียด -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-            <h2 class="text-xl font-semibold text-gray-700 mb-2">📋 ประวัติรายการและตัวกรองข้อมูล</h2>
+        <div class="card bg-white shadow-sm p-4 mb-4">
+            <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-list-task me-1"></i> ประวัติรายการและตัวกรองข้อมูล</h5>
             
-            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div class="w-full">
-                    <label for="filterOwner" class="block text-xs font-bold text-gray-500 mb-1">👤 ตัวกรองผู้ใช้ / กระเป๋า</label>
-                    <select id="filterOwner" title="ตัวกรองผู้ใช้" onchange="updateFilters()" class="w-full h-10 text-sm border border-gray-300 rounded-lg px-2 bg-white outline-none">
+            <div class="row g-3 bg-light p-3 rounded-3 border mb-4 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label for="filterOwner" class="form-label small fw-bold text-muted mb-1">👤 ตัวกรองผู้ใช้ / กระเป๋า</label>
+                    <select id="filterOwner" onchange="updateFilters()" class="form-select text-sm bg-white">
                         <option value="all">🌍 ทุกกระเป๋า / รวมทั้งหมด</option>
                         <option value="me">🙋‍♂️ เฉพาะของฉัน</option>
                         <option value="partner">🙋‍♀️ เฉพาะของแฟน</option>
@@ -173,17 +207,17 @@
                         <option value="emergency">🎯 เฉพาะเงินออมฉุกเฉิน</option>
                     </select>
                 </div>
-                <div class="w-full">
-                    <label for="filterType" class="block text-xs font-bold text-gray-500 mb-1">🔄 ตัวกรองประเภท</label>
-                    <select id="filterType" title="ตัวกรองประเภท" onchange="updateFilters()" class="w-full h-10 text-sm border border-gray-300 rounded-lg px-2 bg-white outline-none">
+                <div class="col-12 col-md-4">
+                    <label for="filterType" class="form-label small fw-bold text-muted mb-1">🔄 ตัวกรองประเภท</label>
+                    <select id="filterType" onchange="updateFilters()" class="form-select text-sm bg-white">
                         <option value="all">🔄 ทั้งรายรับ & รายจ่าย</option>
                         <option value="expense">🔴 เฉพาะรายจ่าย</option>
                         <option value="income">🟢 เฉพาะรายรับ</option>
                     </select>
                 </div>
-                <div class="w-full">
-                    <label for="filterDate" class="block text-xs font-bold text-gray-500 mb-1">📅 ตัวกรองบริหารแยกเดือน (สลับดูประวัติเควสย้อนหลังได้ที่นี่)</label>
-                    <select id="filterDate" title="ตัวกรองช่วงเวลา" onchange="updateFilters()" class="w-full h-10 text-sm border border-gray-300 rounded-lg px-2 bg-white outline-none font-semibold text-blue-600">
+                <div class="col-12 col-md-4">
+                    <label for="filterDate" class="form-label small fw-bold text-muted mb-1">📅 ตัวกรองบริหารแยกเดือน</label>
+                    <select id="filterDate" onchange="updateFilters()" class="form-select text-sm bg-white fw-bold text-primary">
                         <option value="this-month" selected>📅 เฉพาะเดือนนี้</option>
                         <option value="last-month">⏳ เฉพาะเดือนที่แล้ว</option>
                         <option value="all">♾️ แสดงทลายถังทั้งหมด</option>
@@ -191,24 +225,34 @@
                 </div>
             </div>
             
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
                     <thead>
-                        <tr class="border-b border-gray-200 text-gray-500 text-sm">
-                            <th class="pb-2">วัน-เวลา</th>
-                            <th class="pb-2">กระเป๋า</th>
-                            <th class="pb-2">ประเภท</th>
-                            <th class="pb-2">หมวดหมู่</th>
-                            <th class="pb-2">จำนวนเงิน</th>
-                            <th class="pb-2">บันทึก</th>
-                            <th class="pb-2 text-center">จัดการ</th>
+                        <tr class="table-light text-secondary small">
+                            <th>วัน-เวลา</th>
+                            <th>กระเป๋า</th>
+                            <th>ประเภท</th>
+                            <th>หมวดหมู่</th>
+                            <th>จำนวนเงิน</th>
+                            <th>บันทึก</th>
+                            <th class="text-center">จัดการ</th>
                         </tr>
                     </thead>
-                    <tbody id="transactionTableBody" class="text-gray-700 divide-y divide-gray-100"></tbody>
+                    <tbody id="transactionTableBody" class="text-dark"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
+    <style>
+        .btn-indigo {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .btn-indigo:hover {
+            background-color: #4338ca;
+            color: white;
+        }
+    </style>
 </body>
 </html>
