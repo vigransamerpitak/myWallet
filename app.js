@@ -1,4 +1,4 @@
-// app.js - Ultimate Version: 4 กระเป๋าเงิน, ระบบแก้ไข, ล็อกประวัติ Checklist แยกเดือน
+// app.js - Ultimate Version: พร้อมระบบ Toast Alert และ UI โหมดแก้ไขแบบมือโปร
 
 let filterOwner = 'all';
 let filterType = 'all';
@@ -7,7 +7,7 @@ let filterDate = 'this-month';
 window.onload = async function() {
     setTimeout(async () => {
         await loadCategories();
-        await updateFilters(); // เรียกฟังก์ชันคัดกรองเพื่อคำนวณผลทั้งหมดในคราวเดียว
+        await updateFilters();
     }, 400);
 }
 
@@ -21,8 +21,25 @@ async function updateFilters() {
     filterType = document.getElementById('filterType').value;
     filterDate = document.getElementById('filterDate').value;
     
-    await loadGoals();        // โหลด Checklist ให้ตรงกับเดือนที่เลือกดู
-    await loadTransactions(); // คำนวณตารางและยอดเงิน
+    await loadGoals();
+    await loadTransactions();
+}
+
+// 🍞 ฟังก์ชันเรียกใช้ Toast แจ้งเตือนแวบๆ มุมขวาของจอ
+function showToast(message, icon = '✨') {
+    const toast = document.getElementById('toastNotification');
+    document.getElementById('toastIcon').innerText = icon;
+    document.getElementById('toastMessage').innerText = message;
+    
+    // แสดงผล
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    toast.classList.add('translate-y-0', 'opacity-100');
+
+    // ซ่อนตัวอัตโนมัติภายใน 2.5 วินาที
+    setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+    }, 250);
 }
 
 async function loadCategories() {
@@ -58,24 +75,51 @@ async function saveTransaction(categoryName, type) {
         .from('transactions')
         .insert([{ amount: amount, type: type, category_name: categoryName, note: noteInput.value.trim() || null, owner: ownerInput.value }]);
 
-    if (error) alert(error.message); else { amountInput.value = ''; noteInput.value = ''; await loadTransactions(); }
+    if (error) {
+        alert(error.message);
+    } else {
+        amountInput.value = '';
+        noteInput.value = '';
+        showToast('จดบันทึกเรียบร้อยแล้วจ้า! 💰', '✅');
+        await loadTransactions();
+    }
 }
 
-// ✏️ ระบบโหมดแก้ไขและลบรายการย้อนหลัง
+// ✏️ ระบบโหมดแก้ไขแบบส่องไฟสปอตไลท์ (เปลี่ยนสีกรอบและซ่อนปุ่มหมวดหมู่ป้องกันการกดสับสน)
 function enterEditMode(id, amount, note, owner) {
     document.getElementById('editTxId').value = id;
     document.getElementById('txAmount').value = amount;
     document.getElementById('txNote').value = note || '';
     document.getElementById('txOwner').value = owner;
+    
+    // ปรับหน้าตาฟอร์มให้เป็นธีมสีเหลืองโหมดแก้ไขชัดเจน
+    const recordBox = document.getElementById('recordBox');
+    recordBox.classList.remove('bg-white', 'border-transparent');
+    recordBox.classList.add('bg-yellow-50/50', 'border-yellow-400');
+    document.getElementById('recordBoxTitle').innerText = '✏️ แก้ไขข้อมูลรายการย้อนหลัง';
+
+    // ซ่อนโซนปุ่มหมวดหมู่ชั่วคราวเพื่อบังคับให้ผู้ใช้ต้องกดบันทึกหรือยกเลิกเท่านั้น
+    document.getElementById('categoryActionArea').classList.add('hidden');
     document.getElementById('editActionArea').classList.remove('hidden');
+    
     window.scrollTo({ top: 100, behavior: 'smooth' });
 }
+
 function cancelEditMode() {
     document.getElementById('editTxId').value = '';
     document.getElementById('txAmount').value = '';
     document.getElementById('txNote').value = '';
+    
+    // คืนค่าฟอร์มกลับเป็นหน้าตาบันทึกปกติ
+    const recordBox = document.getElementById('recordBox');
+    recordBox.classList.remove('bg-yellow-50/50', 'border-yellow-400');
+    recordBox.classList.add('bg-white', 'border-transparent');
+    document.getElementById('recordBoxTitle').innerText = '✍️ บันทึกรายการใหม่';
+
+    document.getElementById('categoryActionArea').classList.remove('hidden');
     document.getElementById('editActionArea').classList.add('hidden');
 }
+
 async function submitEditTransaction() {
     const id = document.getElementById('editTxId').value;
     const amount = parseFloat(document.getElementById('txAmount').value);
@@ -85,18 +129,30 @@ async function submitEditTransaction() {
     if (!amount || amount <= 0) return alert('กรุณากรอกยอดเงินให้ถูกต้อง');
 
     const { error } = await supabaseClient.from('transactions').update({ amount: amount, note: note || null, owner: owner }).eq('id', id);
-    if (error) alert('แก้ไขล้มเหลว: ' + error.message); else { cancelEditMode(); await loadTransactions(); }
-}
-async function deleteTransaction(id) {
-    if (!confirm('คุณแน่ใจใช่ไหมที่จะลบประวัติรายการเงินแถวนี้ทิ้ง?')) return;
-    const { error } = await supabaseClient.from('transactions').delete().eq('id', id);
-    if (error) alert('ลบไม่สำเร็จ: ' + error.message); else await loadTransactions();
+    
+    if (error) {
+        alert('แก้ไขล้มเหลว: ' + error.message);
+    } else {
+        cancelEditMode();
+        showToast('อัปเดตข้อมูลแก้ไขเรียบร้อยแล้ว!', '💾');
+        await loadTransactions();
+    }
 }
 
-// 🎯 ระบบ Checklist รายเดือนแบบสัมพันธ์กับเวลาที่เลือกดู
+async function deleteTransaction(id) {
+    if (!confirm('คุณแน่ใจใช่ไหมที่จะลบประวัติรายการเงินแถวนี้ทิ้งอย่างถาวร?')) return;
+    const { error } = await supabaseClient.from('transactions').delete().eq('id', id);
+    if (error) {
+        alert('ลบไม่สำเร็จ: ' + error.message);
+    } else {
+        showToast('ลบรายการเงินทิ้งเรียบร้อย', '🗑️');
+        await loadTransactions();
+    }
+}
+
 async function loadGoals() {
     const now = new Date();
-    let targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // รูปแบบ '2026-06'
+    let targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
     if (filterDate === 'last-month') {
         let prevMonth = now.getMonth() - 1; let prevYear = now.getFullYear();
@@ -122,7 +178,6 @@ async function loadGoals() {
     goals.forEach(goal => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-2 rounded-lg border border-gray-100 bg-gray-50 text-xs";
-        // ล็อกปุ่มเช็คบ็อกซ์ถ้าหากทำสำเร็จแล้ว เพื่อความปลอดภัยไม่ให้กดเบิ้ลตังค์งอก
         div.innerHTML = `
             <div class="flex items-center gap-2">
                 <input type="checkbox" ${goal.is_completed ? 'checked disabled' : ''} onchange="toggleGoal(${goal.id}, '${goal.title}', ${goal.amount}, '${goal.type}')" class="w-4 h-4 text-emerald-600 rounded cursor-pointer disabled:opacity-60">
@@ -135,27 +190,25 @@ async function loadGoals() {
 }
 
 async function toggleGoal(id, title, amount, type) {
-    if(!confirm(`ยืนยันการทำภารกิจสำเร็จ: "${title}" ใช่หรือไม่?\nระบบจะทำการบันทึกยอดเงินให้อัตโนมัติทันที`)) {
+    if(!confirm(`ยืนยันการทำภารกิจสำเร็จ: "${title}" ใช่หรือไม่?\nระบบจะทำธุรกรรมล็อกเงินให้อัตโนมัติ`)) {
         await loadGoals(); return;
     }
 
     const { error } = await supabaseClient.from('goals').update({ is_completed: true }).eq('id', id);
     if (error) return alert(error.message);
 
-    // 🚀 ยิงยอดเงินเข้ากล่องออมฉุกเฉิน หรือบันทึกจ่ายบิลกองกลางอัตโนมัติ
     if (type === 'save') {
-        // วิ่งเข้ากระเป๋าเงินออมสำรองฉุกเฉิน (นับเป็นรายรับของกล่องที่ 4)
         await supabaseClient.from('transactions').insert([{ amount: amount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]);
+        showToast('ภารกิจสำเร็จ! ย้ายเงินเข้าคลังฉุกเฉินแล้ว 🎯', '🎉');
     } else {
-        // วิ่งเข้าตัดรายจ่ายบิลของกองกลาง (กระเป๋าส่วนกลาง)
         await supabaseClient.from('transactions').insert([{ amount: amount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: `จ่ายบิลออโต้: ${title}` }]);
+        showToast('จ่ายบิลสำเร็จและตัดยอดกองกลางแล้ว 📄', '✅');
     }
     
     await loadGoals();
-    await loadTransactions();
+    await updateFilters();
 }
 
-// 📊 คำนวณตารางธุรกรรม, แบ่งยอดกระเป๋า, และประมวลผลอันดับรายจ่าย
 async function loadTransactions() {
     const { data: txs, error } = await supabaseClient.from('transactions').select('*').order('created_at', { ascending: false });
     if (error) return console.error(error);
@@ -163,23 +216,22 @@ async function loadTransactions() {
     const tbody = document.getElementById('transactionTableBody');
     tbody.innerHTML = '';
 
-    // ล้างตัวแปรสะสมเพื่อคิดยอดเงินในกระเป๋า (คำนวณตลอดกาลเพื่อให้ยอดสะสมในธนาคารตรงจริงไม่ขาดตอน)
     let myTotal = 0; let partnerTotal = 0; let sharedTotal = 0; let emergencyTotal = 0;
-
     let categorySummary = {}; let totalExpenseFiltered = 0;
+    
     const now = new Date(); const thisMonth = now.getMonth(); const thisYear = now.getFullYear();
 
     txs.forEach(tx => {
         const txDate = new Date(tx.created_at);
         const value = tx.type === 'income' ? tx.amount : -tx.amount;
 
-        // คำนวณกล่องทั้ง 4 (รวมยอดเงินตลอดกาลเพื่อให้รู้ว่ามีเงินติดบัญชีจริงอยู่กี่บาท)
+        // บันทึกยอดกระเป๋าทั้ง 4 แบบเรียลไทม์ (คำนวณสะสมถังหลัก)
         if (tx.owner === 'me') myTotal += value;
         else if (tx.owner === 'partner') partnerTotal += value;
         else if (tx.owner === 'shared') sharedTotal += value;
         else if (tx.owner === 'emergency') emergencyTotal += value;
 
-        // 📅 ระบบตัวกรองสำหรับสถิติรายเดือน และตารางประวัติข้างล่าง
+        // ตัวกรองบริหารแยกเป็นเดือนๆ 
         if (filterDate === 'this-month') {
             if (txDate.getMonth() !== thisMonth || txDate.getFullYear() !== thisYear) return;
         } else if (filterDate === 'last-month') {
@@ -188,14 +240,14 @@ async function loadTransactions() {
             if (txDate.getMonth() !== targetMonth || txDate.getFullYear() !== targetYear) return;
         }
 
-        // เก็บข้อมูลสำหรับกราฟวิเคราะห์รายจ่ายเยอะ/น้อย (คำนวณตามเดือนที่ฟิลเตอร์)
+        // เก็บยอดสำหรับวิเคราะห์
         if (tx.type === 'expense') {
             if (!categorySummary[tx.category_name]) categorySummary[tx.category_name] = 0;
             categorySummary[tx.category_name] += tx.amount;
             totalExpenseFiltered += tx.amount;
         }
 
-        // กรองแถวที่จะวาดลงตารางประวัติตามตัวเลือก UI ด้านล่าง
+        // ฟิลเตอร์แสดงตารางด้านล่าง
         if (filterOwner !== 'all' && tx.owner !== filterOwner) return;
         if (filterType !== 'all' && tx.type !== filterType) return;
 
@@ -223,13 +275,11 @@ async function loadTransactions() {
         tbody.appendChild(row);
     });
 
-    // อัปเดตตัวเลขการแสดงผลบนกระเป๋าทั้ง 4 ใบ
     document.getElementById('myTotal').innerText = `${myTotal.toLocaleString()} บาท`;
     document.getElementById('partnerTotal').innerText = `${partnerTotal.toLocaleString()} บาท`;
     document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString()} บาท`;
     document.getElementById('emergencyTotal').innerText = `${emergencyTotal.toLocaleString()} บาท`;
 
-    // สรุปบิลหารครึ่งกองกลางคิดจากยอดติดลบของกระเป๋าส่วนกลาง
     const totalSharedExpense = Math.abs(sharedTotal);
     const halfBill = totalSharedExpense / 2;
     const billTextEl = document.getElementById('billSummaryText');
