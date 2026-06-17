@@ -1,4 +1,4 @@
-// app.js - Ultimate Version: พร้อมระบบ Toast Alert และ UI โหมดแก้ไขแบบมือโปร
+// app.js - Decimal Supported Version: รองรับทศนิยมและการจัดระเบียบเศษสตางค์ .00 แบบเรียลไทม์
 
 let filterOwner = 'all';
 let filterType = 'all';
@@ -25,17 +25,14 @@ async function updateFilters() {
     await loadTransactions();
 }
 
-// 🍞 ฟังก์ชันเรียกใช้ Toast แจ้งเตือนแวบๆ มุมขวาของจอ
 function showToast(message, icon = '✨') {
     const toast = document.getElementById('toastNotification');
     document.getElementById('toastIcon').innerText = icon;
     document.getElementById('toastMessage').innerText = message;
     
-    // แสดงผล
     toast.classList.remove('translate-y-20', 'opacity-0');
     toast.classList.add('translate-y-0', 'opacity-100');
 
-    // ซ่อนตัวอัตโนมัติภายใน 2.5 วินาที
     setTimeout(() => {
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-20', 'opacity-0');
@@ -67,13 +64,18 @@ async function saveTransaction(categoryName, type) {
     const amountInput = document.getElementById('txAmount');
     const noteInput = document.getElementById('txNote');
     const ownerInput = document.getElementById('txOwner');
+    
+    // แปลงค่าเงินเป็น Float รองรับจุดทศนิยม
     const amount = parseFloat(amountInput.value);
 
-    if (!amount || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่');
+    if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่');
+
+    // บันทึกค่าเงินที่มีเศษทศนิยมตรงเข้า Supabase โดยตัดเศษที่เกินปัดเหลือ 2 ตำแหน่งป้องกันบั๊กข้อมูล
+    const finalAmount = parseFloat(amount.toFixed(2));
 
     const { error } = await supabaseClient
         .from('transactions')
-        .insert([{ amount: amount, type: type, category_name: categoryName, note: noteInput.value.trim() || null, owner: ownerInput.value }]);
+        .insert([{ amount: finalAmount, type: type, category_name: categoryName, note: noteInput.value.trim() || null, owner: ownerInput.value }]);
 
     if (error) {
         alert(error.message);
@@ -85,20 +87,18 @@ async function saveTransaction(categoryName, type) {
     }
 }
 
-// ✏️ ระบบโหมดแก้ไขแบบส่องไฟสปอตไลท์ (เปลี่ยนสีกรอบและซ่อนปุ่มหมวดหมู่ป้องกันการกดสับสน)
 function enterEditMode(id, amount, note, owner) {
     document.getElementById('editTxId').value = id;
-    document.getElementById('txAmount').value = amount;
+    // โหลดค่าเงินเก่าขึ้นมาแสดงผลพร้อมทศนิยมคงเดิม
+    document.getElementById('txAmount').value = parseFloat(amount).toFixed(2);
     document.getElementById('txNote').value = note || '';
     document.getElementById('txOwner').value = owner;
     
-    // ปรับหน้าตาฟอร์มให้เป็นธีมสีเหลืองโหมดแก้ไขชัดเจน
     const recordBox = document.getElementById('recordBox');
     recordBox.classList.remove('bg-white', 'border-transparent');
     recordBox.classList.add('bg-yellow-50/50', 'border-yellow-400');
     document.getElementById('recordBoxTitle').innerText = '✏️ แก้ไขข้อมูลรายการย้อนหลัง';
 
-    // ซ่อนโซนปุ่มหมวดหมู่ชั่วคราวเพื่อบังคับให้ผู้ใช้ต้องกดบันทึกหรือยกเลิกเท่านั้น
     document.getElementById('categoryActionArea').classList.add('hidden');
     document.getElementById('editActionArea').classList.remove('hidden');
     
@@ -110,7 +110,6 @@ function cancelEditMode() {
     document.getElementById('txAmount').value = '';
     document.getElementById('txNote').value = '';
     
-    // คืนค่าฟอร์มกลับเป็นหน้าตาบันทึกปกติ
     const recordBox = document.getElementById('recordBox');
     recordBox.classList.remove('bg-yellow-50/50', 'border-yellow-400');
     recordBox.classList.add('bg-white', 'border-transparent');
@@ -126,9 +125,11 @@ async function submitEditTransaction() {
     const note = document.getElementById('txNote').value.trim();
     const owner = document.getElementById('txOwner').value;
 
-    if (!amount || amount <= 0) return alert('กรุณากรอกยอดเงินให้ถูกต้อง');
+    if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกยอดเงินให้ถูกต้อง');
 
-    const { error } = await supabaseClient.from('transactions').update({ amount: amount, note: note || null, owner: owner }).eq('id', id);
+    const finalAmount = parseFloat(amount.toFixed(2));
+
+    const { error } = await supabaseClient.from('transactions').update({ amount: finalAmount, note: note || null, owner: owner }).eq('id', id);
     
     if (error) {
         alert('แก้ไขล้มเหลว: ' + error.message);
@@ -178,12 +179,13 @@ async function loadGoals() {
     goals.forEach(goal => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-2 rounded-lg border border-gray-100 bg-gray-50 text-xs";
+        // แสดงผลเป้าหมายในรูปแบบทศนิยมสวยงาม
         div.innerHTML = `
             <div class="flex items-center gap-2">
                 <input type="checkbox" ${goal.is_completed ? 'checked disabled' : ''} onchange="toggleGoal(${goal.id}, '${goal.title}', ${goal.amount}, '${goal.type}')" class="w-4 h-4 text-emerald-600 rounded cursor-pointer disabled:opacity-60">
                 <span class="${goal.is_completed ? 'line-through text-gray-400 font-normal' : 'font-semibold text-gray-700'}">${goal.type === 'save' ? '🎯 [ออม]' : '📄 [บิล]'} ${goal.title}</span>
             </div>
-            <span class="font-bold ${goal.is_completed ? 'text-emerald-600' : 'text-gray-900'}">${goal.amount.toLocaleString()} บ.</span>
+            <span class="font-bold ${goal.is_completed ? 'text-emerald-600' : 'text-gray-900'}">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>
         `;
         goalsList.appendChild(div);
     });
@@ -197,11 +199,13 @@ async function toggleGoal(id, title, amount, type) {
     const { error } = await supabaseClient.from('goals').update({ is_completed: true }).eq('id', id);
     if (error) return alert(error.message);
 
+    const finalAmount = parseFloat(parseFloat(amount).toFixed(2));
+
     if (type === 'save') {
-        await supabaseClient.from('transactions').insert([{ amount: amount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]);
+        await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]);
         showToast('ภารกิจสำเร็จ! ย้ายเงินเข้าคลังฉุกเฉินแล้ว 🎯', '🎉');
     } else {
-        await supabaseClient.from('transactions').insert([{ amount: amount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: `จ่ายบิลออโต้: ${title}` }]);
+        await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: `จ่ายบิลออโต้: ${title}` }]);
         showToast('จ่ายบิลสำเร็จและตัดยอดกองกลางแล้ว 📄', '✅');
     }
     
@@ -223,15 +227,15 @@ async function loadTransactions() {
 
     txs.forEach(tx => {
         const txDate = new Date(tx.created_at);
-        const value = tx.type === 'income' ? tx.amount : -tx.amount;
+        const txAmount = parseFloat(tx.amount);
+        const value = tx.type === 'income' ? txAmount : -txAmount;
 
-        // บันทึกยอดกระเป๋าทั้ง 4 แบบเรียลไทม์ (คำนวณสะสมถังหลัก)
+        // คำนวณยอดสะสมของถังเงินแยกประเภท
         if (tx.owner === 'me') myTotal += value;
         else if (tx.owner === 'partner') partnerTotal += value;
         else if (tx.owner === 'shared') sharedTotal += value;
         else if (tx.owner === 'emergency') emergencyTotal += value;
 
-        // ตัวกรองบริหารแยกเป็นเดือนๆ 
         if (filterDate === 'this-month') {
             if (txDate.getMonth() !== thisMonth || txDate.getFullYear() !== thisYear) return;
         } else if (filterDate === 'last-month') {
@@ -240,14 +244,12 @@ async function loadTransactions() {
             if (txDate.getMonth() !== targetMonth || txDate.getFullYear() !== targetYear) return;
         }
 
-        // เก็บยอดสำหรับวิเคราะห์
         if (tx.type === 'expense') {
             if (!categorySummary[tx.category_name]) categorySummary[tx.category_name] = 0;
-            categorySummary[tx.category_name] += tx.amount;
-            totalExpenseFiltered += tx.amount;
+            categorySummary[tx.category_name] += txAmount;
+            totalExpenseFiltered += txAmount;
         }
 
-        // ฟิลเตอร์แสดงตารางด้านล่าง
         if (filterOwner !== 'all' && tx.owner !== filterOwner) return;
         if (filterType !== 'all' && tx.type !== filterType) return;
 
@@ -265,20 +267,21 @@ async function loadTransactions() {
             <td class="py-2.5">${ownerBadge}</td>
             <td class="py-2.5 font-medium ${tx.type === 'expense' ? 'text-red-500' : 'text-green-500'}">${tx.type === 'expense' ? 'รายจ่าย 🔴' : 'รายรับ 🟢'}</td>
             <td class="py-2.5 font-medium">${tx.category_name}</td>
-            <td class="py-2.5 font-bold">${tx.amount.toLocaleString()} บาท</td>
+            <td class="py-2.5 font-bold">${txAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</td>
             <td class="py-2.5 text-gray-500 text-xs">${tx.note || '-'}</td>
             <td class="py-2.5 text-center space-x-1 whitespace-nowrap">
-                <button onclick="enterEditMode(${tx.id}, ${tx.amount}, '${tx.note || ''}', '${tx.owner}')" class="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-1 rounded hover:bg-yellow-100 cursor-pointer">✏️ แก้</button>
+                <button onclick="enterEditMode(${tx.id}, ${txAmount}, '${tx.note || ''}', '${tx.owner}')" class="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-1 rounded hover:bg-yellow-100 cursor-pointer">✏️ แก้</button>
                 <button onclick="deleteTransaction(${tx.id})" class="text-xs bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded hover:bg-red-100 cursor-pointer">🗑️ ลบ</button>
             </td>
         `;
         tbody.appendChild(row);
     });
 
-    document.getElementById('myTotal').innerText = `${myTotal.toLocaleString()} บาท`;
-    document.getElementById('partnerTotal').innerText = `${partnerTotal.toLocaleString()} บาท`;
-    document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString()} บาท`;
-    document.getElementById('emergencyTotal').innerText = `${emergencyTotal.toLocaleString()} บาท`;
+    // แสดงผลยอดเงินสุทธิของทั้ง 4 กระเป๋าแบบทศนิยม 2 ตำแหน่งปลอดภัยสูง
+    document.getElementById('myTotal').innerText = `${myTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
+    document.getElementById('partnerTotal').innerText = `${partnerTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
+    document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
+    document.getElementById('emergencyTotal').innerText = `${emergencyTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
 
     const totalSharedExpense = Math.abs(sharedTotal);
     const halfBill = totalSharedExpense / 2;
@@ -286,7 +289,7 @@ async function loadTransactions() {
     if (totalSharedExpense === 0) {
         billTextEl.innerText = "🎉 ยอดส่วนกลางเจ๊ากันพอดี ไม่มีใครค้างตังค์ใครครับ";
     } else {
-        billTextEl.innerHTML = `รายจ่ายกองกลางรวมสะสม: <span class="font-bold underline text-yellow-300">${totalSharedExpense.toLocaleString()} บาท</span><br><span class="text-xs text-purple-100">เฉลี่ยควักเนื้อกระเป๋าคนละ: ${halfBill.toLocaleString()} บาท เพื่อให้กองกลางสมดุลครับ 👩‍❤️‍👨</span>`;
+        billTextEl.innerHTML = `รายจ่ายกองกลางรวมสะสม: <span class="font-bold underline text-yellow-300">${totalSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span><br><span class="text-xs text-purple-100">เฉลี่ยควักเนื้อกระเป๋าคนละ: ${halfBill.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท เพื่อให้กองกลางสมดุลครับ 👩‍❤️‍👨</span>`;
     }
 
     renderAnalytics(categorySummary, totalExpenseFiltered);
@@ -305,7 +308,7 @@ function renderAnalytics(summary, total) {
         const card = document.createElement('div');
         card.className = "bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1";
         card.innerHTML = `
-            <div class="flex justify-between text-xs font-medium"><span class="text-gray-700">🛒 ${item.name}</span><span class="text-gray-900 font-bold">${item.amount.toLocaleString()} บ. (${percentage}%)</span></div>
+            <div class="flex justify-between text-xs font-medium"><span class="text-gray-700">🛒 ${item.name}</span><span class="text-gray-900 font-bold">${item.amount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ. (${percentage}%)</span></div>
             <div class="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden"><div class="bg-red-500 h-full" style="width: ${percentage}%"></div></div>
         `;
         area.appendChild(card);

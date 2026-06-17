@@ -37,19 +37,19 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl shadow-sm text-center">
                 <p class="text-xs font-semibold text-blue-600">กระเป๋าของฉัน 🙋‍♂️</p>
-                <p id="myTotal" class="text-xl font-bold text-blue-800">0 บาท</p>
+                <p id="myTotal" class="text-xl font-bold text-blue-800">0.00 บาท</p>
             </div>
             <div class="bg-pink-50 border border-pink-200 p-4 rounded-2xl shadow-sm text-center">
                 <p class="text-xs font-semibold text-pink-600">กระเป๋าของแฟน 🙋‍♀️</p>
-                <p id="partnerTotal" class="text-xl font-bold text-pink-800">0 บาท</p>
+                <p id="partnerTotal" class="text-xl font-bold text-pink-800">0.00 บาท</p>
             </div>
             <div class="bg-purple-50 border border-purple-200 p-4 rounded-2xl shadow-sm text-center">
                 <p class="text-xs font-semibold text-purple-600">เงินกองกลางร่วมกัน 🤝</p>
-                <p id="sharedTotal" class="text-xl font-bold text-purple-800">0 บาท</p>
+                <p id="sharedTotal" class="text-xl font-bold text-purple-800">0.00 บาท</p>
             </div>
             <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm text-center ring-2 ring-emerald-400/30">
                 <p class="text-xs font-semibold text-emerald-600">เงินออมสำรองฉุกเฉิน 🎯</p>
-                <p id="emergencyTotal" class="text-xl font-bold text-emerald-800">0 บาท</p>
+                <p id="emergencyTotal" class="text-xl font-bold text-emerald-800">0.00 บาท</p>
             </div>
         </div>
 
@@ -82,7 +82,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="w-full">
                     <label for="txAmount" class="block text-sm font-medium text-gray-600 mb-1">จำนวนเงิน (บาท)</label>
-                    <input type="number" id="txAmount" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                    <input type="number" id="txAmount" step="0.01" inputmode="decimal" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
                 </div>
                 <div class="w-full">
                     <label for="txNote" class="block text-sm font-medium text-gray-600 mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
