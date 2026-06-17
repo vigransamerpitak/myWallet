@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบเช็ครายรับรายจ่ายคู่รัก (Super Version)</title>
+    <title>ระบบคู่รักนักออม - เวอร์ชันออมฉุกเฉินสูงสุด</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js" defer></script>
@@ -12,11 +12,8 @@
         async function checkUserAuth() {
             setTimeout(async () => {
                 const { data } = await supabaseClient.auth.getSession();
-                if (!data.session) {
-                    window.location.href = 'login.html';
-                } else {
-                    document.getElementById('userDisplay').innerText = `ผู้ใช้งาน: ${data.session.user.email}`;
-                }
+                if (!data.session) { window.location.href = 'login.html'; }
+                else { document.getElementById('userDisplay').innerText = `ผู้ใช้งาน: ${data.session.user.email}`; }
             }, 300);
         }
         checkUserAuth();
@@ -33,52 +30,55 @@
 
         <h1 class="text-3xl font-bold text-center text-gray-800">👩‍❤️‍👨 บันทึกรายรับ-รายจ่ายคู่รัก</h1>
 
-        <!-- 📊 สรุปภาพรวมกระเป๋าเงิน (ตามตัวกรองเดือนที่เลือก) -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- 📊 สรุปภาพรวมกระเป๋าเงิน ยกระดับ 4 กล่อง! -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl shadow-sm text-center">
-                <p class="text-sm font-medium text-blue-600">กระเป๋าของฉัน 🙋‍♂️</p>
-                <p id="myTotal" class="text-2xl font-bold text-blue-800">0 บาท</p>
+                <p class="text-xs font-semibold text-blue-600">กระเป๋าของฉัน 🙋‍♂️</p>
+                <p id="myTotal" class="text-xl font-bold text-blue-800">0 บาท</p>
             </div>
             <div class="bg-pink-50 border border-pink-200 p-4 rounded-2xl shadow-sm text-center">
-                <p class="text-sm font-medium text-pink-600">กระเป๋าของแฟน 🙋‍♀️</p>
-                <p id="partnerTotal" class="text-2xl font-bold text-pink-800">0 บาท</p>
+                <p class="text-xs font-semibold text-pink-600">กระเป๋าของแฟน 🙋‍♀️</p>
+                <p id="partnerTotal" class="text-xl font-bold text-pink-800">0 บาท</p>
             </div>
             <div class="bg-purple-50 border border-purple-200 p-4 rounded-2xl shadow-sm text-center">
-                <p class="text-sm font-medium text-purple-600">เงินกองกลางร่วมกัน 🤝</p>
-                <p id="sharedTotal" class="text-2xl font-bold text-purple-800">0 บาท</p>
+                <p class="text-xs font-semibold text-purple-600">เงินกองกลางร่วมกัน 🤝</p>
+                <p id="sharedTotal" class="text-xl font-bold text-purple-800">0 บาท</p>
+            </div>
+            <!-- 🎯 กล่องที่ 4 เงินออมสำรองฉุกเฉินแยกขาดจากทุกส่วน -->
+            <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm text-center ring-2 ring-emerald-400/30">
+                <p class="text-xs font-semibold text-emerald-600">เงินออมสำรองฉุกเฉิน 🎯</p>
+                <p id="emergencyTotal" class="text-xl font-bold text-emerald-800">0 บาท</p>
             </div>
         </div>
 
-        <!-- 🤝 สรุปบิลหารครึ่งตอนสิ้นเดือน & 🎯 Checklist การเงิน -->
+        <!-- บิลเคลียร์ตังค์ & Checklist -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- กล่องสรุปบิลเคลียร์ตังค์ -->
             <div class="bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-6 rounded-2xl shadow-md space-y-3">
-                <h2 class="text-lg font-bold flex items-center gap-1">🤝 สรุปบิลหารครึ่ง (สิ้นเดือนเคลียร์ตังค์)</h2>
-                <p class="text-xs text-purple-200">คำนวณจากยอดรายจ่าย "ส่วนกลาง" ทั้งหมดของเดือนที่เลือก</p>
+                <h2 class="text-base font-bold flex items-center gap-1">🤝 สรุปบิลหารครึ่งประจำเดือน</h2>
                 <div class="bg-white/10 p-4 rounded-xl backdrop-blur-xs">
-                    <p id="billSummaryText" class="text-base font-semibold text-center py-2">กำลังคำนวณยอดบิล...</p>
+                    <p id="billSummaryText" class="text-sm font-semibold text-center">กำลังคำนวณยอดบิล...</p>
                 </div>
             </div>
 
-            <!-- กล่องภารกิจออมเงิน/จ่ายบิลประจำ -->
             <div class="bg-white p-6 rounded-2xl shadow-sm space-y-3">
-                <h2 class="text-lg font-bold text-gray-700">🎯 Checklist ภารกิจการเงินประจำเดือน</h2>
-                <div id="goalsList" class="space-y-2 max-h-[140px] overflow-y-auto pr-1">
-                    <!-- รายการภารกิจจะมาแสดงตรงนี้ -->
-                </div>
+                <h2 class="text-base font-bold text-gray-700 flex justify-between items-center">
+                    <span>🎯 Checklist ภารกิจการเงิน</span>
+                    <span id="checklistMonthLabel" class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md"></span>
+                </h2>
+                <div id="goalsList" class="space-y-2 max-h-[140px] overflow-y-auto pr-1"></div>
             </div>
         </div>
 
-        <!-- 📊 วิเคราะห์อันดับการใช้จ่าย -->
+        <!-- กราฟวิเคราะห์ -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-            <h2 class="text-xl font-semibold text-gray-700">📊 วิเคราะห์รายจ่ายยอดฮิต (ตามตัวกรองด้านล่าง)</h2>
+            <h2 class="text-xl font-semibold text-gray-700">📊 สัดส่วนรายจ่ายเยอะ-น้อย</h2>
             <div id="analyticsArea" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </div>
 
-        <!-- ส่วนที่ 1: บันทึกรายการใหม่ -->
+        <!-- บันทึกรายการใหม่ -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
             <h2 class="text-xl font-semibold text-gray-700">✍️ บันทึกรายการใหม่</h2>
-            <input type="hidden" id="editTxId" value=""> <!-- ช่องลับสำหรับเก็บ ID เวลาอัปเดตแก้ไขข้อมูล -->
+            <input type="hidden" id="editTxId" value="">
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -87,19 +87,19 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-600 mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
-                    <input type="text" id="txNote" placeholder="กินอะไรมา, ซื้ออะไรไป" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                    <input type="text" id="txNote" placeholder="ระบุรายละเอียด หรือเหตุฉุกเฉิน" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-1">รายการนี้เป็นของใคร?</label>
-                    <select id="txOwner" class="w-full border border-gray-300 rounded-lg p-2 outline-none bg-white">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน?</label>
+                    <select id="txOwner" class="w-full border border-gray-300 rounded-lg p-2 outline-none bg-white font-medium">
                         <option value="shared">🤝 ใช้ร่วมกัน (หารครึ่ง/กองกลาง)</option>
                         <option value="me">🙋‍♂️ ของฉันคนเดียว</option>
                         <option value="partner">🙋‍♀️ ของแฟนคนเดียว</option>
+                        <option value="emergency">🚨 ถอน/ฝาก เข้าเงินออมฉุกเฉิน</option>
                     </select>
                 </div>
             </div>
 
-            <!-- ปุ่มกดยืนยันการแก้ไขข้อมูล (จะโผล่มาเฉพาะตอนกดปุ่มแก้ไขเท่านั้น) -->
             <div id="editActionArea" class="hidden bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-center">
                 <span class="text-sm font-semibold text-yellow-800">กำลังอยู่ในโหมดแก้ไขข้อมูลย้อนหลัง</span>
                 <div class="space-x-2">
@@ -119,42 +119,19 @@
             </div>
         </div>
 
-        <!-- ส่วนที่ 2: ตั้งค่าหลังบ้าน -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-            <h2 class="text-xl font-semibold text-gray-700">⚙️ ตั้งค่าปุ่มกด/หมวดหมู่</h2>
-            <div class="flex flex-wrap gap-2 items-end">
-                <div class="flex-1 min-w-[150px]">
-                    <label class="block text-sm font-medium text-gray-600 mb-1">ชื่อหมวดหมู่ใหม่</label>
-                    <input type="text" id="newCatName" placeholder="เช่น ค่าจิปาถะ" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-1">ประเภท</label>
-                    <select id="newCatType" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
-                        <option value="expense">รายจ่าย 🔴</option>
-                        <option value="income">รายรับ 🟢</option>
-                    </select>
-                </div>
-                <button onclick="addCategory()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition cursor-pointer">➕ เพิ่มปุ่ม</button>
-            </div>
-
-            <div class="border-t pt-4">
-                <p class="text-sm font-medium text-gray-500 mb-2">รายการปุ่มทั้งหมดในระบบ (คลิก ❌ เพื่อลบปุ่มออก)</p>
-                <div id="manageCategoriesList" class="flex flex-wrap gap-2"></div>
-            </div>
-        </div>
-
-        <!-- ส่วนที่ 3: ตารางแสดงประวัติและระบบคัดกรองข้อมูลแบบละเอียด -->
+        <!-- ประวัติและตัวกรอง -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
             <h2 class="text-xl font-semibold text-gray-700 mb-2">📋 ประวัติรายการและตัวกรองข้อมูล</h2>
             
             <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">👤 ตัวกรองผู้ใช้</label>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">👤 ตัวกรองผู้ใช้ / กระเป๋า</label>
                     <select id="filterOwner" onchange="updateFilters()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white outline-none">
-                        <option value="all">🌍 ทุกคน / รวมทั้งหมด</option>
+                        <option value="all">🌍 ทุกกระเป๋า / รวมทั้งหมด</option>
                         <option value="me">🙋‍♂️ เฉพาะของฉัน</option>
                         <option value="partner">🙋‍♀️ เฉพาะของแฟน</option>
                         <option value="shared">🤝 เฉพาะส่วนกลาง</option>
+                        <option value="emergency">🎯 เฉพาะเงินออมฉุกเฉิน</option>
                     </select>
                 </div>
                 <div>
@@ -166,11 +143,11 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">📅 ตัวกรองช่วงเวลา (จัดการตัดยอดแยกเดือน)</label>
-                    <select id="filterDate" onchange="updateFilters()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white outline-none">
+                    <label class="block text-xs font-bold text-gray-500 mb-1">📅 ตัวกรองบริหารแยกเดือน (ระบบตัดยอดรายเดือน)</label>
+                    <select id="filterDate" onchange="updateFilters()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white outline-none font-semibold text-blue-600">
                         <option value="this-month" selected>📅 เฉพาะเดือนนี้</option>
                         <option value="last-month">⏳ เฉพาะเดือนที่แล้ว</option>
-                        <option value="all">♾️ แสดงทั้งหมด (ทุกช่วงเวลา)</option>
+                        <option value="all">♾️ แสดงทลายถังทั้งหมด</option>
                     </select>
                 </div>
             </div>
