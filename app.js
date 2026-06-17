@@ -1,4 +1,4 @@
-// app.js - Decimal Supported Version: รองรับทศนิยมและการจัดระเบียบเศษสตางค์ .00 แบบเรียลไทม์
+// app.js - Phase 1 Ultimate: รองรับ 4 กระเป๋า, แก้ไขข้อมูล, บันลึกเควสสำเร็จ/กากบาท, CRUD Checklist หน้าเว็บ
 
 let filterOwner = 'all';
 let filterType = 'all';
@@ -21,7 +21,7 @@ async function updateFilters() {
     filterType = document.getElementById('filterType').value;
     filterDate = document.getElementById('filterDate').value;
     
-    await loadGoals();
+    await loadGoals(); 
     await loadTransactions();
 }
 
@@ -36,7 +36,7 @@ function showToast(message, icon = '✨') {
     setTimeout(() => {
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-20', 'opacity-0');
-    }, 250);
+    }, 2500);
 }
 
 async function loadCategories() {
@@ -64,13 +64,9 @@ async function saveTransaction(categoryName, type) {
     const amountInput = document.getElementById('txAmount');
     const noteInput = document.getElementById('txNote');
     const ownerInput = document.getElementById('txOwner');
-    
-    // แปลงค่าเงินเป็น Float รองรับจุดทศนิยม
     const amount = parseFloat(amountInput.value);
 
     if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่');
-
-    // บันทึกค่าเงินที่มีเศษทศนิยมตรงเข้า Supabase โดยตัดเศษที่เกินปัดเหลือ 2 ตำแหน่งป้องกันบั๊กข้อมูล
     const finalAmount = parseFloat(amount.toFixed(2));
 
     const { error } = await supabaseClient
@@ -87,9 +83,9 @@ async function saveTransaction(categoryName, type) {
     }
 }
 
+// ✏️ ระบบแก้ไขและลบประวัติรายการเงิน
 function enterEditMode(id, amount, note, owner) {
     document.getElementById('editTxId').value = id;
-    // โหลดค่าเงินเก่าขึ้นมาแสดงผลพร้อมทศนิยมคงเดิม
     document.getElementById('txAmount').value = parseFloat(amount).toFixed(2);
     document.getElementById('txNote').value = note || '';
     document.getElementById('txOwner').value = owner;
@@ -126,7 +122,6 @@ async function submitEditTransaction() {
     const owner = document.getElementById('txOwner').value;
 
     if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกยอดเงินให้ถูกต้อง');
-
     const finalAmount = parseFloat(amount.toFixed(2));
 
     const { error } = await supabaseClient.from('transactions').update({ amount: finalAmount, note: note || null, owner: owner }).eq('id', id);
@@ -143,14 +138,37 @@ async function submitEditTransaction() {
 async function deleteTransaction(id) {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบประวัติรายการเงินแถวนี้ทิ้งอย่างถาวร?')) return;
     const { error } = await supabaseClient.from('transactions').delete().eq('id', id);
+    if (error) alert('ลบไม่สำเร็จ: ' + error.message); else { showToast('ลบรายการเงินทิ้งเรียบร้อย', '🗑️'); await loadTransactions(); }
+}
+
+// 🎯 🔥 ฟีเจอร์เฟส 1: เพิ่มภารกิจใหม่เข้าเดือนปัจจุบันแบบเรียลไทม์จากหน้าจอ
+async function createNewGoalFrontend() {
+    const titleInput = document.getElementById('newGoalTitle');
+    const amountInput = document.getElementById('newGoalAmount');
+    const typeInput = document.getElementById('newGoalType');
+    
+    const title = titleInput.value.trim();
+    const amount = parseFloat(amountInput.value);
+    
+    if (!title || isNaN(amount) || amount <= 0) return alert('กรุณากรอกชื่อเควสและยอดเงินตั้งเป้าหมายให้ถูกต้องครับ');
+
+    const now = new Date();
+    const targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const { error } = await supabaseClient
+        .from('goals')
+        .insert([{ title: title, amount: amount, type: typeInput.value, goal_month: targetMonthStr, is_completed: false, is_failed: false }]);
+
     if (error) {
-        alert('ลบไม่สำเร็จ: ' + error.message);
+        alert(error.message);
     } else {
-        showToast('ลบรายการเงินทิ้งเรียบร้อย', '🗑️');
-        await loadTransactions();
+        titleInput.value = ''; amountInput.value = '';
+        showToast('เพิ่มภารกิจลงหน้าจอสำเร็จแล้ว!', '➕');
+        await loadGoals();
     }
 }
 
+// 🎯 🔥 ระบบโหลดเควสย้อนหลัง และจัดการติ๊กถูก/กากบาท
 async function loadGoals() {
     const now = new Date();
     let targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -165,52 +183,95 @@ async function loadGoals() {
 
     let query = supabaseClient.from('goals').select('*');
     if (filterDate !== 'all') { query = query.eq('goal_month', targetMonthStr); }
-    const { data: goals, error } = await query.order('id', { ascending: true });
+    let { data: goals, error } = await query.order('id', { ascending: true });
 
     if (error) return console.error(error);
+
+    // ระบบโคลนเควสกรณีขึ้นเดือนใหม่แล้วยังว่างเปล่า
+    if (goals.length === 0 && filterDate !== 'all') {
+        const defaultGoals = [
+            { title: 'ออมเงินกองกลางไปเที่ยวญี่ปุ่น', amount: 2000, type: 'save', goal_month: targetMonthStr },
+            { title: 'จ่ายค่าส่วนกลางคอนโด', amount: 1500, type: 'bill', goal_month: targetMonthStr },
+            { title: 'หยอดกระปุกสำรองฉุกเฉินเพิ่ม', amount: 1000, type: 'save', goal_month: targetMonthStr }
+        ];
+        const { data: insertedData, error: insertError } = await supabaseClient.from('goals').insert(defaultGoals).select();
+        if (!insertError) { goals = insertedData; showToast(`สร้าง Checklist เดือน ${targetMonthStr} ออโต้จ้า!`, '🎉'); }
+    }
+
     const goalsList = document.getElementById('goalsList');
     goalsList.innerHTML = '';
 
-    if (goals.length === 0) {
-        goalsList.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">ไม่มีภารกิจการเงินถูกกำหนดไว้ในเดือนนี้</p>';
+    if (!goals || goals.length === 0) {
+        goalsList.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">ไม่มีภารกิจการเงินระบุไว้</p>';
         return;
     }
 
     goals.forEach(goal => {
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-2 rounded-lg border border-gray-100 bg-gray-50 text-xs";
-        // แสดงผลเป้าหมายในรูปแบบทศนิยมสวยงาม
+        
+        // 🎨 ออกแบบปุ่มติ๊กถูก / กากบาท และล็อกประวัติย้อนหลังถ้าตัดสินใจสถานะไปแล้ว
+        let actionUI = '';
+        if (goal.is_completed) {
+            actionUI = `<span class="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">✅ สำเร็จ</span>`;
+        } else if (goal.is_failed) {
+            actionUI = `<span class="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md border border-red-200">❌ ล้มเหลว</span>`;
+        } else {
+            // เควสที่ยังว่างอยู่ -> เปิดปุ่มให้เลือกว่าจะ ติ๊กถูก หรือ กากบาท
+            actionUI = `
+                <div class="space-x-1 whitespace-nowrap">
+                    <button onclick="settleGoal(${goal.id}, 'success', '${goal.title}', ${goal.amount}, '${goal.type}')" class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium hover:bg-emerald-100 cursor-pointer">✅ ออมแล้ว</button>
+                    <button onclick="settleGoal(${goal.id}, 'failed', '${goal.title}', ${goal.amount}, '${goal.type}')" class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded font-medium hover:bg-red-100 cursor-pointer">❌ ข้าม</button>
+                    <button onclick="deleteGoalFrontend(${goal.id})" class="text-gray-400 hover:text-black font-bold ml-1 text-xs cursor-pointer" title="ลบเควสนี้ทิ้ง">🗑️</button>
+                </div>
+            `;
+        }
+
         div.innerHTML = `
-            <div class="flex items-center gap-2">
-                <input type="checkbox" ${goal.is_completed ? 'checked disabled' : ''} onchange="toggleGoal(${goal.id}, '${goal.title}', ${goal.amount}, '${goal.type}')" class="w-4 h-4 text-emerald-600 rounded cursor-pointer disabled:opacity-60">
-                <span class="${goal.is_completed ? 'line-through text-gray-400 font-normal' : 'font-semibold text-gray-700'}">${goal.type === 'save' ? '🎯 [ออม]' : '📄 [บิล]'} ${goal.title}</span>
+            <div class="flex items-center gap-1.5 truncate">
+                <span class="${goal.is_completed ? 'line-through text-gray-400' : goal.is_failed ? 'line-through text-gray-300' : 'font-semibold text-gray-700'}">${goal.type === 'save' ? '🎯' : '📄'} ${goal.title}</span>
             </div>
-            <span class="font-bold ${goal.is_completed ? 'text-emerald-600' : 'text-gray-900'}">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>
+            <div class="flex items-center gap-3 shrink-0">
+                <span class="font-bold text-gray-800">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>
+                ${actionUI}
+            </div>
         `;
         goalsList.appendChild(div);
     });
 }
 
-async function toggleGoal(id, title, amount, type) {
-    if(!confirm(`ยืนยันการทำภารกิจสำเร็จ: "${title}" ใช่หรือไม่?\nระบบจะทำธุรกรรมล็อกเงินให้อัตโนมัติ`)) {
-        await loadGoals(); return;
-    }
+// 🔥 ระบบประมวลผลการกดปุ่ม "ออมแล้ว" หรือ "ข้าม (กากบาท)"
+async function settleGoal(id, status, title, amount, type) {
+    if (status === 'success') {
+        if (!confirm(`ยืนยันทำเควสสำเร็จ: "${title}"?\nระบบจะล็อกยอดโอนเงินเข้าบัญชีให้ทันที`)) return;
+        
+        const { error } = await supabaseClient.from('goals').update({ is_completed: true }).eq('id', id);
+        if (error) return alert(error.message);
 
-    const { error } = await supabaseClient.from('goals').update({ is_completed: true }).eq('id', id);
-    if (error) return alert(error.message);
-
-    const finalAmount = parseFloat(parseFloat(amount).toFixed(2));
-
-    if (type === 'save') {
-        await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]);
-        showToast('ภารกิจสำเร็จ! ย้ายเงินเข้าคลังฉุกเฉินแล้ว 🎯', '🎉');
+        const finalAmount = parseFloat(parseFloat(amount).toFixed(2));
+        if (type === 'save') {
+            await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]);
+            showToast('ย้ายเงินเข้าบัญชีฉุกเฉินแล้ว 🎯', '🎉');
+        } else {
+            await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: `จ่ายบิลออโต้: ${title}` }]);
+            showToast('ตัดยอดบิลส่วนกลางเรียบร้อย 📄', '✅');
+        }
     } else {
-        await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: `จ่ายบิลออโต้: ${title}` }]);
-        showToast('จ่ายบิลสำเร็จและตัดยอดกองกลางแล้ว 📄', '✅');
+        if (!confirm(`เดือนนี้ไม่ได้ออม/ไม่ได้จ่ายรายการ: "${title}" ใช่ไหม?\nระบบจะขึ้นเครื่องหมายกากบาทเป็นประวัติความล้มเหลวไว้ครับ`)) return;
+        const { error } = await supabaseClient.from('goals').update({ is_failed: true }).eq('id', id);
+        if (error) return alert(error.message);
+        showToast('บันทึกสถิติข้ามเควสแล้ว ❌', '📁');
     }
-    
+
     await loadGoals();
-    await updateFilters();
+    await loadTransactions();
+}
+
+// 🔥 ปุ่มกดลบเควสออกจากตารางหน้าบ้านตรงๆ
+async function deleteGoalFrontend(id) {
+    if (!confirm('ต้องการลบภารกิจนี้ออกจากหน้าจอใช่ไหมครับ?')) return;
+    const { error } = await supabaseClient.from('goals').delete().eq('id', id);
+    if (error) alert(error.message); else { showToast('ลบภารกิจออกแล้ว', '🗑️'); await loadGoals(); }
 }
 
 async function loadTransactions() {
@@ -222,7 +283,6 @@ async function loadTransactions() {
 
     let myTotal = 0; let partnerTotal = 0; let sharedTotal = 0; let emergencyTotal = 0;
     let categorySummary = {}; let totalExpenseFiltered = 0;
-    
     const now = new Date(); const thisMonth = now.getMonth(); const thisYear = now.getFullYear();
 
     txs.forEach(tx => {
@@ -230,7 +290,6 @@ async function loadTransactions() {
         const txAmount = parseFloat(tx.amount);
         const value = tx.type === 'income' ? txAmount : -txAmount;
 
-        // คำนวณยอดสะสมของถังเงินแยกประเภท
         if (tx.owner === 'me') myTotal += value;
         else if (tx.owner === 'partner') partnerTotal += value;
         else if (tx.owner === 'shared') sharedTotal += value;
@@ -277,7 +336,6 @@ async function loadTransactions() {
         tbody.appendChild(row);
     });
 
-    // แสดงผลยอดเงินสุทธิของทั้ง 4 กระเป๋าแบบทศนิยม 2 ตำแหน่งปลอดภัยสูง
     document.getElementById('myTotal').innerText = `${myTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
     document.getElementById('partnerTotal').innerText = `${partnerTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
     document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
