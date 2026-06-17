@@ -123,10 +123,10 @@
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
             <h2 class="text-xl font-semibold text-gray-700 mb-2">📋 ประวัติรายการและตัวกรองข้อมูล</h2>
             
-            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">👤 ตัวกรองผู้ใช้ / กระเป๋า</label>
-                    <select id="filterOwner" onchange="updateFilters()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white outline-none">
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div class="w-full">
+                    <label for="filterOwner" class="block text-xs font-bold text-gray-500 mb-1">👤 ตัวกรองผู้ใช้ / กระเป๋า</label>
+                    <select id="filterOwner" title="ตัวกรองผู้ใช้" onchange="updateFilters()" class="w-full h-10 text-sm border border-gray-300 rounded-lg px-2 bg-white outline-none">
                         <option value="all">🌍 ทุกกระเป๋า / รวมทั้งหมด</option>
                         <option value="me">🙋‍♂️ เฉพาะของฉัน</option>
                         <option value="partner">🙋‍♀️ เฉพาะของแฟน</option>
@@ -134,17 +134,17 @@
                         <option value="emergency">🎯 เฉพาะเงินออมฉุกเฉิน</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">🔄 ตัวกรองประเภท</label>
-                    <select id="filterType" onchange="updateFilters()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white outline-none">
+                <div class="w-full">
+                    <label for="filterType" class="block text-xs font-bold text-gray-500 mb-1">🔄 ตัวกรองประเภท</label>
+                    <select id="filterType" title="ตัวกรองประเภท" onchange="updateFilters()" class="w-full h-10 text-sm border border-gray-300 rounded-lg px-2 bg-white outline-none">
                         <option value="all">🔄 ทั้งรายรับ & รายจ่าย</option>
                         <option value="expense">🔴 เฉพาะรายจ่าย</option>
                         <option value="income">🟢 เฉพาะรายรับ</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">📅 ตัวกรองบริหารแยกเดือน (ระบบตัดยอดรายเดือน)</label>
-                    <select id="filterDate" onchange="updateFilters()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white outline-none font-semibold text-blue-600">
+                <div class="w-full">
+                    <label for="filterDate" class="block text-xs font-bold text-gray-500 mb-1">📅 ตัวกรองบริหารแยกเดือน</label>
+                    <select id="filterDate" title="ตัวกรองช่วงเวลา" onchange="updateFilters()" class="w-full h-10 text-sm border border-gray-300 rounded-lg px-2 bg-white outline-none font-semibold text-blue-600">
                         <option value="this-month" selected>📅 เฉพาะเดือนนี้</option>
                         <option value="last-month">⏳ เฉพาะเดือนที่แล้ว</option>
                         <option value="all">♾️ แสดงทลายถังทั้งหมด</option>
