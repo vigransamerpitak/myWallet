@@ -4,20 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบเช็ครายรับรายจ่ายคู่รัก (Dynamic)</title>
-    <!-- โหลด Tailwind CSS ผ่าน CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- โหลด Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- เชื่อมโยงไฟล์คอนฟิกและไฟล์ระบบ -->
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
+    <script>
+        // 🛡️ ระบบ Guard: ตรวจสอบการล็อกอินก่อนเริ่มวาดหน้าเว็บ
+        async function checkUserAuth() {
+            // หน่วงเวลาเล็กน้อยให้หน้าเว็บโหลดสคริปต์เสร็จ
+            setTimeout(async () => {
+                const { data } = await supabaseClient.auth.getSession();
+                if (!data.session) {
+                    // ถ้าไม่มี Session (ไม่ได้ล็อกอิน) บังคับเด้งไปหน้า login.html ทันที
+                    window.location.href = 'login.html';
+                } else {
+                    // ถ้าระบบล็อกอินอยู่ ให้เก็บอีเมลผู้ใช้ไว้แสดงผล
+                    document.getElementById('userDisplay').innerText = `ผู้ใช้งาน: ${data.session.user.email}`;
+                }
+            }, 300);
+        }
+        checkUserAuth();
+    </script>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto space-y-6">
+        <div class="flex justify-between items-center bg-white px-6 py-3 rounded-xl shadow-sm">
+            <span id="userDisplay" class="text-sm font-medium text-gray-600">กำลังตรวจสอบ...</span>
+            <button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-red-100 hover:text-red-700 transition cursor-pointer">🚪 ออกจากระบบ</button>
+        </div>
+
         <h1 class="text-3xl font-bold text-center text-gray-800">👩‍❤️‍👨 บันทึกรายรับ-รายจ่ายของเรา</h1>
 
-        <!-- 📊 ส่วนที่เพิ่มเข้ามาใหม่: สรุปภาพรวมกระเป๋าเงิน -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl shadow-sm text-center">
                 <p class="text-sm font-medium text-blue-600">กระเป๋าของฉัน 🙋‍♂️</p>
@@ -33,7 +51,6 @@
             </div>
         </div>
 
-        <!-- ส่วนที่ 1: ส่วนเพิ่มรายการเงินและเลือกปุ่มหมวดหมู่ -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
             <h2 class="text-xl font-semibold text-gray-700">✍️ บันทึกรายการใหม่</h2>
             
@@ -46,7 +63,6 @@
                     <label class="block text-sm font-medium text-gray-600 mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
                     <input type="text" id="txNote" placeholder="กินอะไรมา, ซื้ออะไรไป" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
                 </div>
-                <!-- 🔘 เพิ่มวิทเจ็ตเลือกเจ้าของเงิน -->
                 <div>
                     <label class="block text-sm font-medium text-gray-600 mb-1">รายการนี้เป็นของใคร?</label>
                     <select id="txOwner" class="w-full border border-gray-300 rounded-lg p-2 outline-none bg-white">
@@ -57,20 +73,17 @@
                 </div>
             </div>
 
-            <!-- โซนเลือกปุ่มหมวดหมู่รายจ่าย -->
             <div>
                 <label class="block text-sm font-medium text-red-600 mb-2">🔴 เลือกหมวดหมู่รายจ่าย (คลิกเพื่อบันทึกทันที)</label>
                 <div id="expenseButtons" class="flex flex-wrap gap-2"></div>
             </div>
 
-            <!-- โซนเลือกปุ่มหมวดหมู่รายรับ -->
             <div>
                 <label class="block text-sm font-medium text-green-600 mb-2">🟢 เลือกหมวดหมู่รายรับ (คลิกเพื่อบันทึกทันที)</label>
                 <div id="incomeButtons" class="flex flex-wrap gap-2"></div>
             </div>
         </div>
 
-        <!-- ส่วนที่ 2: หน้าตั้งค่าหลังบ้าน (แก้ไขปุ่มกดบนหน้าเว็บได้เลย) -->
         <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
             <h2 class="text-xl font-semibold text-gray-700">⚙️ ตั้งค่าปุ่มกด/หมวดหมู่</h2>
             <div class="flex flex-wrap gap-2 items-end">
@@ -94,22 +107,32 @@
             </div>
         </div>
 
-        <!-- ส่วนที่ 3: ตารางแสดงประวัติธุรกรรมล่าสุด -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4 overflow-x-auto">
-            <h2 class="text-xl font-semibold text-gray-700">📋 ประวัติการทำรายการล่าสุด</h2>
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b border-gray-200 text-gray-500 text-sm">
-                        <th class="pb-2">วัน-เวลา</th>
-                        <th class="pb-2">กระเป๋า</th>
-                        <th class="pb-2">ประเภท</th>
-                        <th class="pb-2">หมวดหมู่</th>
-                        <th class="pb-2">จำนวนเงิน</th>
-                        <th class="pb-2">บันทึก</th>
-                    </tr>
-                </thead>
-                <tbody id="transactionTableBody" class="text-gray-700 divide-y divide-gray-100"></tbody>
-            </table>
+        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h2 class="text-xl font-semibold text-gray-700">📋 ประวัติการทำรายการล่าสุด</h2>
+                
+                <div class="bg-gray-100 p-1 rounded-xl flex gap-1 border border-gray-200">
+                    <button onclick="changeFilter('all')" id="filter-all" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white shadow-sm text-gray-800 cursor-pointer">🌍 ดูรวมทั้งหมด</button>
+                    <button onclick="changeFilter('me')" id="filter-me" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-500 hover:text-gray-800 cursor-pointer">🙋‍♂️ ดูเฉพาะของฉัน</button>
+                    <button onclick="changeFilter('partner')" id="filter-partner" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-500 hover:text-gray-800 cursor-pointer">🙋‍♀️ ดูเฉพาะของแฟน</button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-gray-200 text-gray-500 text-sm">
+                            <th class="pb-2">วัน-เวลา</th>
+                            <th class="pb-2">กระเป๋า</th>
+                            <th class="pb-2">ประเภท</th>
+                            <th class="pb-2">หมวดหมู่</th>
+                            <th class="pb-2">จำนวนเงิน</th>
+                            <th class="pb-2">บันทึก</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionTableBody" class="text-gray-700 divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 

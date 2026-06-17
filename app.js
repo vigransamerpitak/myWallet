@@ -1,18 +1,47 @@
-// app.js - เวอร์ชันแก้บั๊กชื่อตัวแปรซ้ำ
+// app.js - เวอร์ชันแยก User ล็อกอิน + ระบบกรอง Filter ข้อมูล
+
+// ตัวแปรเก็บสถานะการฟิลเตอร์ปัจจุบัน (เริ่มต้นให้โชว์รวมทั้งหมด 'all')
+let currentFilter = 'all'; 
 
 window.onload = async function() {
-    await loadCategories();
+    // ให้เวลาระบบตรวจสอบความปลอดภัยในหน้า HTML แป๊บหนึ่งก่อนดึงฐานข้อมูล
+    setTimeout(async () => {
+        await loadCategories();
+        await loadTransactions();
+    }, 400);
+}
+
+// ฟังก์ชันออกจากระบบ
+async function handleLogout() {
+    const { error } = await supabaseClient.auth.signOut();
+    window.location.href = 'login.html';
+}
+
+// ฟังก์ชันเปลี่ยนมุมมองการกรองข้อมูล
+async function changeFilter(filterType) {
+    currentFilter = filterType;
+    
+    // สลับสีปุ่มเลือกให้สวยงามตามสถานะที่กด
+    ['all', 'me', 'partner'].forEach(type => {
+        const btn = document.getElementById(`filter-${type}`);
+        if (type === filterType) {
+            btn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-white shadow-sm text-gray-800 cursor-pointer";
+        } else {
+            btn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-500 hover:text-gray-800 cursor-pointer";
+        }
+    });
+
+    // โหลดตารางใหม่ตามเงื่อนไขที่เลือก
     await loadTransactions();
 }
 
 async function loadCategories() {
-    // เปลี่ยนเป็น supabaseClient
     const { data: categories, error } = await supabaseClient
         .from('categories')
         .select('*')
         .order('name', { ascending: true });
 
-    if (error) return alert('เกิดข้อผิดพลาดในการดึงข้อมูลหมวดหมู่: ' + error.message);
+    if (error) return console.error(error);
 
     const expenseArea = document.getElementById('expenseButtons');
     const incomeArea = document.getElementById('incomeButtons');
@@ -44,17 +73,14 @@ async function loadCategories() {
 async function addCategory() {
     const nameInput = document.getElementById('newCatName');
     const typeInput = document.getElementById('newCatType');
-
     if (!nameInput.value.trim()) return alert('กรุณากรอกชื่อหมวดหมู่');
 
-    // เปลี่ยนเป็น supabaseClient
     const { error } = await supabaseClient
         .from('categories')
         .insert([{ name: nameInput.value.trim(), type: typeInput.value }]);
 
-    if (error) {
-        alert('ไม่สามารถเพิ่มได้: ' + error.message);
-    } else {
+    if (error) alert(error.message);
+    else {
         nameInput.value = '';
         await loadCategories();
     }
@@ -62,9 +88,8 @@ async function addCategory() {
 
 async function deleteCategory(id) {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบปุ่มหมวดหมู่นี้?')) return;
-    // เปลี่ยนเป็น supabaseClient
     const { error } = await supabaseClient.from('categories').delete().eq('id', id);
-    if (error) alert('ลบไม่สำเร็จ: ' + error.message);
+    if (error) alert(error.message);
     else await loadCategories();
 }
 
@@ -76,7 +101,6 @@ async function saveTransaction(categoryName, type) {
 
     if (!amount || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนกดเลือกปุ่มหมวดหมู่ครับ');
 
-    // เปลี่ยนเป็น supabaseClient
     const { error } = await supabaseClient
         .from('transactions')
         .insert([{ 
@@ -87,9 +111,8 @@ async function saveTransaction(categoryName, type) {
             owner: ownerInput.value
         }]);
 
-    if (error) {
-        alert('บันทึกรายการล้มเหลว: ' + error.message);
-    } else {
+    if (error) alert(error.message);
+    else {
         amountInput.value = '';
         noteInput.value = '';
         await loadTransactions();
@@ -97,18 +120,18 @@ async function saveTransaction(categoryName, type) {
 }
 
 async function loadTransactions() {
-    // เปลี่ยนเป็น supabaseClient
     const { data: txs, error } = await supabaseClient
         .from('transactions')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100); // ดึงข้อมูลมาสำรอง 100 รายการเพื่อใช้คำนวณ Dashboard
 
     if (error) return console.error(error);
 
     const tbody = document.getElementById('transactionTableBody');
     tbody.innerHTML = '';
 
+    // กล่องเก็บยอดรวมสุทธิ (คิดจากทุกรายการที่มีในฐานข้อมูลเสมอ ไม่เกี่ยวกับ Filter ตารางด้านล่าง)
     let myTotal = 0;
     let partnerTotal = 0;
     let sharedTotal = 0;
@@ -118,6 +141,11 @@ async function loadTransactions() {
         if (tx.owner === 'me') myTotal += value;
         else if (tx.owner === 'partner') partnerTotal += value;
         else sharedTotal += value;
+
+        // ตรวจสอบเงื่อนไขตัวกรอง (Filter) ก่อนเอามาวาดแถวลงบนตารางประวัติ
+        if (currentFilter !== 'all' && tx.owner !== currentFilter) {
+            return; // ข้ามแถวนี้ไปเลยถ้าเจ้าของไม่ตรงกับ Filter ที่กดเลือกดู
+        }
 
         let ownerBadge = '';
         if (tx.owner === 'me') ownerBadge = '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">🙋‍♂️ ฉัน</span>';
@@ -138,6 +166,7 @@ async function loadTransactions() {
         tbody.appendChild(row);
     });
 
+    // แสดงผลยอดรวมสุทธิบน Dashboard ด้านบนเสมอ
     document.getElementById('myTotal').innerText = `${myTotal.toLocaleString()} บาท`;
     document.getElementById('partnerTotal').innerText = `${partnerTotal.toLocaleString()} บาท`;
     document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString()} บาท`;
