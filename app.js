@@ -415,12 +415,11 @@ async function loadTransactions() {
 
         billTextEl.innerHTML = `
             รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br>
-            <div class="text-start mt-2 small text-white-50">
-                • คุณควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ.<br>
-                • แฟนควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.
+            <div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">
+                • คุณควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | แฟนควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.
             </div>
             <hr class="my-2 text-white-50">
-            ${settlementResultText}
+            <div class="text-center">${settlementResultText}</div>
         `;
     }
 

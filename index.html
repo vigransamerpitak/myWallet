@@ -163,33 +163,33 @@
         <div class="row g-3 mb-4">
             <div class="col-6 col-md-3">
                 <div class="card balance-card bg-my-wallet h-100">
-                    <div class="card-body p-2 text-center">
-                        <p class="small fw-bold opacity-75 mb-1">กระเป๋าของฉัน 🙋‍♂️</p>
-                        <h4 id="myTotal" class="fw-bold mb-0">0.00 บาท</h4>
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าของฉัน 🙋‍♂️</p>
+                        <h4 id="myTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="card balance-card bg-partner-wallet h-100">
-                    <div class="card-body p-2 text-center">
-                        <p class="small fw-bold opacity-75 mb-1">กระเป๋าของแฟน 🙋‍♀️</p>
-                        <h4 id="partnerTotal" class="fw-bold mb-0">0.00 บาท</h4>
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าของแฟน 🙋‍♀️</p>
+                        <h4 id="partnerTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="card balance-card bg-shared-wallet h-100">
-                    <div class="card-body p-2 text-center">
-                        <p class="small fw-bold opacity-75 mb-1">เงินกองกลางร่วมกัน 🤝</p>
-                        <h4 id="sharedTotal" class="fw-bold mb-0">0.00 บาท</h4>
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">เงินกองกลางร่วมกัน 🤝</p>
+                        <h4 id="sharedTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="card balance-card bg-emergency-wallet h-100">
-                    <div class="card-body p-2 text-center">
-                        <p class="small fw-bold opacity-75 mb-1">เงินออมสำรองฉุกเฉิน 🎯</p>
-                        <h4 id="emergencyTotal" class="fw-bold mb-0">0.00 บาท</h4>
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">เงินออมสำรองฉุกเฉิน 🎯</p>
+                        <h4 id="emergencyTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
                     </div>
                 </div>
             </div>
@@ -197,21 +197,21 @@
 
         <div class="row g-4 mb-4">
             <div class="col-12 col-md-6">
-                <div class="card text-white h-100 border-0 p-4 shadow-sm" style="background: linear-gradient(135deg, #4f46e5, #3730a3); border-radius: 24px;">
-                    <h5 class="fw-bold mb-3 d-flex align-items-center"><i class="bi bi-calculator-fill me-2"></i> บิลหารครึ่งประจำรอบเดือน</h5>
-                    <div class="p-3 bg-white bg-opacity-10 rounded-4 mt-auto">
-                        <p id="billSummaryText" class="small fw-medium mb-0 text-center">กำลังประมวลผลกระแสเงินสด...</p>
+                <div class="card text-white border-0 p-3 shadow-sm" style="background: linear-gradient(135deg, #4f46e5, #3730a3); border-radius: 24px; min-height: 215px;">
+                    <h6 class="fw-bold mb-2 d-flex align-items-center justify-content-center justify-content-md-start"><i class="bi bi-calculator-fill me-2"></i> บิลหารครึ่งประจำรอบเดือน</h6>
+                    <div class="p-2.5 bg-white bg-opacity-10 rounded-4 my-auto text-center">
+                        <div id="billSummaryText" class="small fw-medium mb-0">กำลังประมวลผลกระแสเงินสด...</div>
                     </div>
                 </div>
             </div>
 
             <div class="col-12 col-md-6">
-                <div class="card bg-white h-100 border-0 shadow-xs p-4" style="border-radius: 24px; border: 1px solid rgba(226, 232, 240, 0.8)!important;">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center"><i class="bi bi-trophy-fill text-warning me-2"></i> Checklist ภารกิจเงิน</h5>
-                        <span id="checklistMonthLabel" class="badge bg-slate-100 text-secondary border-0 rounded-pill px-3 py-1.5"></span>
+                <div class="card bg-white border-0 shadow-xs p-3" style="border-radius: 24px; border: 1px solid rgba(226, 232, 240, 0.8)!important; min-height: 215px;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-dark mb-0 d-flex align-items-center"><i class="bi bi-trophy-fill text-warning me-2"></i> Checklist ภารกิจเงิน</h6>
+                        <span id="checklistMonthLabel" class="badge bg-light text-secondary border-0 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;"></span>
                     </div>
-                    <div id="goalsList" class="overflow-y-auto pe-1" style="max-height: 160px;"></div>
+                    <div id="goalsList" class="overflow-y-auto pe-1" style="max-height: 150px;"></div>
                 </div>
             </div>
         </div>
