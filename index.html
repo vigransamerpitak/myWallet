@@ -17,10 +17,35 @@
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
     <script>
-// 📱 โค้ดเดิม: ลงทะเบียน PWA เพื่อให้แอปเซฟลงหน้าจอมือถือได้ (เก็บไว้ดีแล้วครับ)
+// 📱 ระบบลงทะเบียน PWA อัจฉริยะ (ตรวจจับเวอร์ชันใหม่แล้วบังคับล้างแคชทันที)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js')
-                .then(() => console.log('PWA Registered!'));
+                .then(reg => {
+                    console.log('PWA Registered!');
+                    
+                    // ดักจับเมื่อมีการอัปเดตไฟล์บน GitHub Pages
+                    reg.onupdatefound = () => {
+                        const installingWorker = reg.installing;
+                        installingWorker.onstatechange = () => {
+                            if (installingWorker.state === 'installed') {
+                                if (navigator.serviceWorker.controller) {
+                                    // 🚀 เจอเวอร์ชันใหม่! สั่งล้างแคชและรีเฟรชหน้าเว็บอัตโนมัติ 1 รอบทันที
+                                    console.log('New update available! Clearing cache and reloading...');
+                                    
+                                    if (caches) {
+                                        caches.keys().then(names => {
+                                            for (let name of names) caches.delete(name);
+                                        });
+                                    }
+                                    
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 500);
+                                }
+                            }
+                        };
+                    };
+                }).catch(err => console.error('PWA Registration failed:', err));
         }
 
         // ⏳ โค้ดใหม่: ตรวจสอบ Auth พร้อมระบบซ่อนม่านบังตา ป้องกันหน้าแวบโชว์เลข 0
