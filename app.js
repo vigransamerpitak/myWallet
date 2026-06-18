@@ -8,7 +8,6 @@ let currentUserRole = 'me';
 function initUserIdentity(userId) {
     const userDisplay = document.getElementById('userDisplay');
     const txOwnerInput = document.getElementById('txOwner');
-    // 💡 อย่าลืมสลับ UID ของคุณเดฟตรงนี้เหมือนเดิมนะครับ
     if (userId === '4ffee1dd-ff34-47c0-a623-7dcc76d80c0f') {
         currentUserRole = 'me';
         userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">คุณเดฟ (แอดมิน)</span>`;
@@ -22,13 +21,13 @@ function initUserIdentity(userId) {
 
 window.onload = function() {
     setTimeout(async () => {
-        setupSlipScannerListener(); // เปิดระบบดักจับการอัปโหลดสลิป
+        setupSlipScannerListener(); // เปิดระบบดักจับและส่งสลิปให้ AI ประมวลผล
         await loadCategories();
         await updateFilters();
     }, 400);
 }
 
-// 🖼️ เทคนิคที่ 1: ฟังก์ชันบีบอัดรูปภาพหน้าบ้านให้เหลือไฟล์จิ๋ว (~100KB) ก่อนส่งขึ้น Cloud
+// 🖼️ เทคนิคบีบอัดรูปภาพหน้าบ้านก่อนส่งขึ้น Cloud (~100KB)
 function compressImage(file) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -38,7 +37,7 @@ function compressImage(file) {
             img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800; // บีบความกว้างสลิปให้พอดีสายตา AI
+                const MAX_WIDTH = 800;
                 let width = img.width; let height = img.height;
 
                 if (width > MAX_WIDTH) {
@@ -48,7 +47,6 @@ function compressImage(file) {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // เซฟเป็นไฟล์ JPEG คุณภาพ 0.7 (ลดขนาดไฟล์ได้ 90% แต่ตัวหนังสือยังชัดแจ๋ว)
                 ctx.canvas.toBlob((blob) => {
                     resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
                 }, 'image/jpeg', 0.7);
@@ -57,7 +55,7 @@ function compressImage(file) {
     });
 }
 
-// 🤖 ระบบดักจับและส่งสลิปให้ AI ดึงข้อมูลออโต้
+// 🤖 ระบบสแกนสลิปอัจฉริยะควบโครงสร้างมัดแน่นสไตล์ Gemini 1.5 Flash ล่าสุด
 function setupSlipScannerListener() {
     const slipInput = document.getElementById('slipInput');
     if (!slipInput) return;
@@ -70,10 +68,15 @@ function setupSlipScannerListener() {
         statusEl.classList.remove('d-none');
 
         try {
-            // 1. บีบอัดรูปทันที
+            // 1. ตรวจเช็คว่ามีคีย์ระบบดึงมาใช้งานหรือยัง
+            if (typeof GEMINI_API_KEY === 'undefined' || !GEMINI_API_KEY) {
+                throw new Error("หา API Key ในไฟล์ secrets.js ไม่เจอ กรุณารีเช็คไฟล์สิทธิ์หลังบ้านครับ");
+            }
+
+            // 2. ย่อรูปสลิปทันที
             const compressedFile = await compressImage(file);
 
-            // 2. อัปโหลดขึ้นถังพักชั่วคราว Supabase Storage (Bucket: slips)
+            // 3. อัปโหลดเข้าถังพักชั่วคราว Supabase Storage (Bucket: slips)
             const fileExt = compressedFile.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
             
@@ -84,38 +87,37 @@ function setupSlipScannerListener() {
 
             if (uploadError) throw uploadError;
 
-            // 3. ดึง Public URL ของสลิปเพื่อส่งให้ Gemini อ่าน
-            const { data: urlData } = supabaseClient.storage.from('slips').getPublicUrl(fileName);
-            const slipPublicUrl = urlData.publicUrl;
-
-            // 4. แปลงภาพเป็น Base64 เพื่อยิงเข้าข้อกำหนดข้อบังคับของ Gemini API
+            // 4. แปลงภาพสลิปส่วนนี้เป็น Base64 ส่งให้ Gemini ถอดรหัสโครงสร้างมัดแน่น
             const base64Data = await new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(compressedFile);
                 reader.onloadend = () => resolve(reader.result.split(',')[1]);
             });
 
-            // 5. สั่งงาน Gemini Flash AI ให้แกะยอดเงินและวันเวลาภาษาไทยบนสลิปธนาคาร
             const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
             const promptPayload = {
                 contents: [{
                     parts: [
-                        { text: "This is a Thai bank transfer slip. Please extract the total transfer amount (number only, e.g. 150.00) and the transfer date/time. Respond strictly in this JSON format: {\"amount\": 150.00}" },
+                        { text: "นี่คือรูปสลิปโอนเงินของธนาคารในไทย ให้แกะข้อมูลยอดเงินสุทธิที่โอนสำเร็จ (Total/Amount) ออกมาเป็นตัวเลขทศนิยมเท่านั้น เช่น 150.00 หรือ 2500.50 ห้ามมีตัวอักษรอื่นปน ตอบกลับเฉพาะโครงสร้าง JSON รูปแบบนี้เท่านั้น: {\"amount\": 150.00}" },
                         { inlineData: { mimeType: "image/jpeg", data: base64Data } }
                     ]
-                }]
+                }],
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
             };
 
             const response = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(promptPayload) });
             const resData = await response.json();
-            const aiText = resData.candidates[0].content.parts[0].text.trim();
             
-            // ดักจับเอาเฉพาะ JSON สตริงออกมาป้องกันข้อความส่วนเกิน
-            const jsonMatch = aiText.match(/\{.*\}/s);
-            if (!jsonMatch) throw new Error("AI แกะโครงสร้างสลิปไม่สำเร็จ");
-            const result = JSON.parse(jsonMatch[0]);
+            if (!resData.candidates || resData.candidates.length === 0) {
+                throw new Error(resData.error?.message || "Google Gemini ปฏิเสธการแกะโครงสร้างสลิปใบนี้");
+            }
 
-            // 6. ป้อนยอดเงินเข้าช่องกรอกเงินออโต้! พร้อมเก็บลิ้งค์รูปภาพสลิปซ่อนไว้ในช่อง Note
+            const aiText = resData.candidates[0].content.parts[0].text.trim();
+            const result = JSON.parse(aiText);
+
+            // 5. ป้อนยอดเงินเข้าแบบฟอร์มออโต้
             document.getElementById('txAmount').value = parseFloat(result.amount).toFixed(2);
             document.getElementById('txNote').value = `[SLIP_URL:${fileName}] รอคุณระบุชื่อรายการจริง`;
             
@@ -178,7 +180,6 @@ async function saveTransaction(categoryName, type) {
     let dbOwner = ownerInput.value;
     let finalNote = noteInput.value.trim();
 
-    // หากเป็นการบันทึกสลิปที่ AI สแกนมา แต่ยังไม่ได้เลือกหมวดหมู่จริง ให้บังคับเข้าหมวดหมู่วิเคราะห์ชั่วคราว
     let finalCategory = categoryName;
     if (finalNote.includes('[SLIP_URL:')) {
         finalCategory = "สลิปรอระบุหมวดหมู่";
@@ -213,7 +214,6 @@ function enterEditMode(id, amount, note, originalOwner) {
         else if (displayNote.startsWith('[จ่ายโดย: partner]')) { displayOwner = 'shared-partner'; displayNote = displayNote.replace('[จ่ายโดย: partner] ', '').replace('[จ่ายโดย: partner]', ''); }
     }
 
-    // ดึงค่าสลิปโชว์ให้เห็นในโหมดแก้ไข เผื่อต้องการกดรีเช็คความถูกต้องรูปภาพ
     const existingSlipArea = document.getElementById('existingSlipArea');
     if (existingSlipArea) existingSlipArea.remove();
 
@@ -254,7 +254,6 @@ function cancelEditMode() {
     document.getElementById('categoryActionArea').classList.remove('d-none'); document.getElementById('editActionArea').classList.add('d-none');
 }
 
-// 🔥 🧠 [ลอจิกหัวใจสำคัญของแบบที่ 2] พอกดเซฟเปลี่ยนหมวดหมู่จริงสำเร็จ สั่งลบรูปออกจาก Storage คืนพื้นที่ทันที!
 async function submitEditTransaction() {
     const id = document.getElementById('editTxId').value;
     const amount = parseFloat(document.getElementById('txAmount').value);
@@ -265,7 +264,6 @@ async function submitEditTransaction() {
     if (isNaN(amount) || amount <= 0) return showToast('กรุณากรอกยอดเงินให้ถูกต้อง', '🔢', true);
     const finalAmount = parseFloat(amount.toFixed(2));
 
-    // ดึงค่าประวัติรายการเดิมมาเช็คว่ามีไฟล์รูปสลิปผูกไว้ไหม เพื่อเตรียมสั่งทำลายทิ้ง
     const { data: currentTx } = await supabaseClient.from('transactions').select('note').eq('id', id).single();
     let fileToDelete = null;
     if (currentTx && currentTx.note && currentTx.note.includes('[SLIP_URL:')) {
@@ -276,24 +274,27 @@ async function submitEditTransaction() {
     let dbOwner = owner;
     let finalNote = note;
 
-    // ถ้าผู้ใช้เคลียร์ลบแท็กโน้ตรอระบุออกแล้ว และใส่ข้อความใหม่แทน
-    if (finalNote.includes('[SLIP_URL:')) {
-        // หากผู้ใช้ยังไม่ได้เปลี่ยนข้อความโน้ต ให้ดึงแท็กรูปภาพสลิปเก็บไว้ก่อนจนกว่าจะกรอกข้อความจริง
-    }
-
     if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: me] ${finalNote}` : `[จ่ายโดย: me]`; } 
     else if (dbOwner === 'shared-partner') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: partner] ${finalNote}` : `[จ่ายโดย: partner]`; }
 
-    // 1. อัปเดตข้อมูลหมวดหมู่และโน้ตจริงลงฐานข้อมูล
-    const { error } = await supabaseClient.from('transactions').update({ amount: finalAmount, note: finalNote || null, owner: dbOwner }).eq('id', id);
+    // เปลี่ยนจาก "สลิปรอระบุหมวดหมู่" กลับเป็นหมวดหมู่จริงที่แอดมินกดแก้ไขสับเปลี่ยน
+    const { error } = await supabaseClient.from('transactions').update({ amount: finalAmount, note: finalNote || null, owner: dbOwner, category_name: document.getElementById('recordBoxTitle').innerText.includes('แก้ไข') ? undefined : 'สลิปรอระบุหมวดหมู่' }).eq('id', id);
     
-    if (error) {
-        showToast(`แก้ไขล้มเหลว: ${error.message}`, '❌', true);
+    // ดักจับจังหวะสับเปลี่ยนหมวดหมู่: ถ้าแก้เปลี่ยนชื่อเรียบร้อย ให้ลบไฟล์รูปออกจากถัง Supabase เพื่อประหยัดพื้นที่ทันที
+    const { data: checkData } = await supabaseClient.from('transactions').select('category_name').eq('id', id).single();
+    let finalCategoryToUpdate = checkData.category_name;
+    if (finalCategoryToUpdate === "สลิปรอระบุหมวดหมู่") {
+         finalCategoryToUpdate = "ทั่วไป"; // หมวดหมู่พื้นฐานกันเหนียว
+    }
+
+    const { error: updateError } = await supabaseClient.from('transactions').update({ amount: finalAmount, note: finalNote || null, owner: dbOwner, category_name: finalCategoryToUpdate }).eq('id', id);
+
+    if (updateError) {
+        showToast(`แก้ไขล้มเหลว: ${updateError.message}`, '❌', true);
     } else {
-        // 2. 🔥 ลอจิกทำลายหลักฐานคืนพื้นที่กิ๊กกะไบต์: บันทึกหมวดหมู่จริงสำเร็จปั๊บ สั่งลบรูปสลิปใบนั้นออกจาก Storage ทันที!
         if (fileToDelete && !finalNote.includes('[SLIP_URL:')) {
             await supabaseClient.storage.from('slips').remove([fileToDelete]);
-            console.log(`[Storage Purged] ลบไฟล์รูปสลิป ${fileToDelete} ออกเพื่อคืนพื้นที่ 500MB เรียบร้อย`);
+            console.log(`[Storage Purged] ลบไฟล์รูปสลิป ${fileToDelete} คืนพื้นที่เสร็จสิ้น`);
         }
 
         cancelEditMode();
@@ -305,7 +306,6 @@ async function submitEditTransaction() {
 async function deleteTransaction(id) {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบประวัติรายการเงินแถวนี้ทิ้งอย่างถาวร?')) return;
     
-    // ดักลบไฟล์รูปใน Storage ออกด้วยถ้ากดยกเลิกทิ้งแถวรายการนั้น
     const { data: currentTx } = await supabaseClient.from('transactions').select('note').eq('id', id).single();
     if (currentTx && currentTx.note && currentTx.note.includes('[SLIP_URL:')) {
         const match = currentTx.note.match(/\[SLIP_URL:(.*?)\]/);
@@ -422,7 +422,6 @@ async function loadTransactions() {
         }
         let passTypeFilter = true; if (filterType !== 'all' && tx.type !== filterType) passTypeFilter = false;
 
-        // สังเกตป้ายกำกับเตือนความจำ: หากเป็นสลิปที่รอระบุหมวดหมู่ ให้คงสถิติกราฟวิเคราะห์ไว้ตามจริง
         if (isCurrentFilterMonth && passOwnerFilter && passTypeFilter && tx.type === 'expense') {
             if (!categorySummary[tx.category_name]) categorySummary[tx.category_name] = 0;
             categorySummary[tx.category_name] += txAmount; totalExpenseFiltered += txAmount;
@@ -438,7 +437,6 @@ async function loadTransactions() {
         else if (exactOwner === 'shared-partner') ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง (แฟนจ่าย)</span>';
         else ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง</span>';
 
-        // ปัดข้อความแจ้งเตือนรูปสลิปหลบไปแสดงผลป้ายสัญลักษณ์สวยๆ บนตารางแทน
         let displayNoteText = cleanNote;
         if (displayNoteText.includes('[SLIP_URL:')) {
             displayNoteText = displayNoteText.replace(/\[SLIP_URL:.*?\]/g, '').trim() || '📷 แนบไฟล์สลิป (คลิก ✏️ แก้ เพื่อลงหมวดหมู่จริง)';

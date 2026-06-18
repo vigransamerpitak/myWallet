@@ -13,28 +13,27 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="secrets.js"></script>
+    <script src="secrets.js" defer></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
     <script>
-// 📱 ระบบลงทะเบียน PWA อัจฉริยะ (ตรวจจับเวอร์ชันใหม่แล้วบังคับล้างแคชทันที)
- // 📱 สั่งถอนรากถอนโคน Service Worker และคลังแคชทั้งหมดเพื่อเคลียร์บั๊กหลอกตา
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-            registration.unregister();
-            console.log('Service Worker Unregistered successfully!');
+        // 📱 สั่งถอนรากถอนโคน Service Worker และคลังแคชทั้งหมดเพื่อเคลียร์บั๊กหลอกตาถาวร
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker Unregistered successfully!');
+                }
+            });
         }
-    });
-}
-if ('caches' in window) {
-    caches.keys().then(function(names) {
-        for (let name of names) caches.delete(name);
-        console.log('All Cache Storages Cleared!');
-    });
-}
+        if ('caches' in window) {
+            caches.keys().then(function(names) {
+                for (let name of names) caches.delete(name);
+                console.log('All Cache Storages Cleared!');
+            });
+        }
 
-        // ⏳ โค้ดใหม่: ตรวจสอบ Auth พร้อมระบบซ่อนม่านบังตา ป้องกันหน้าแวบโชว์เลข 0
+        // ⏳ ตรวจสอบ Auth พร้อมระบบซ่อนม่านบังตา ป้องกันหน้าแวบโชว์เลข 0
         async function checkUserAuth() {
             setTimeout(async () => {
                 const { data } = await supabaseClient.auth.getSession();
@@ -47,136 +46,37 @@ if ('caches' in window) {
                     const overlay = document.getElementById('authOverlay');
                     if (overlay) {
                         overlay.style.opacity = '0';
-                        setTimeout(() => overlay.remove(), 200); // ลบแท็กทิ้งหลังจากจางหายไปแล้ว
+                        setTimeout(() => overlay.remove(), 200);
                     }
                 }
             }, 300);
         }
         checkUserAuth();
-        
     </script>
     
     <style>
-        /* 🎨 Custom UI Styling - ลบความแข็งกระด้าง เติมความหรูหราแบบมินิมอล */
-        body {
-            background-color: #f8fafc;
-            font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif;
-            color: #334155;
-        }
-        
-        /* การ์ดสไตล์เรียบหรู มนกลม นุ่มนวล */
-        .premium-card {
-            border: none !important;
-            border-radius: 24px !important;
-            box-shadow: 0 8px 24px rgba(148, 163, 184, 0.05), 0 1px 2px rgba(148, 163, 184, 0.02) !important;
-            background-color: #ffffff;
-            padding: 1.5rem !important;
-            margin-bottom: 1.5rem;
-            border: 1px solid rgba(226, 232, 240, 0.8) !important;
-        }
-
-        .balance-card {
-            border: none !important;
-            border-radius: 20px !important;
-            padding: 1.25rem 1rem !important;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .balance-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 20px rgba(148, 163, 184, 0.08) !important;
-        }
-
-        /* โทนสีพาสเทลละมุนตาแบบฟินเทคสมัยใหม่ */
+        body { background-color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif; color: #334155; }
+        .premium-card { border: none !important; border-radius: 24px !important; box-shadow: 0 8px 24px rgba(148, 163, 184, 0.05), 0 1px 2px rgba(148, 163, 184, 0.02) !important; background-color: #ffffff; padding: 1.5rem !important; margin-bottom: 1.5rem; border: 1px solid rgba(226, 232, 240, 0.8) !important; }
+        .balance-card { border: none !important; border-radius: 20px !important; padding: 1.25rem 1rem !important; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+        .balance-card:hover { transform: translateY(-4px); box-shadow: 0 12px 20px rgba(148, 163, 184, 0.08) !important; }
         .bg-my-wallet { background-color: #eff6ff; color: #1e6091; }
         .bg-partner-wallet { background-color: #fff1f2; color: #e11d48; }
         .bg-shared-wallet { background-color: #fef9c3; color: #854d0e; }
         .bg-emergency-wallet { background-color: #ecfdf5; color: #065f46; border: 1px solid rgba(16, 185, 129, 0.2) !important; }
-
-        /* ฟอร์มและอินพุตแบบเรียบร้อย สะอาดตา */
-        .form-control, .form-select {
-            border-radius: 14px !important;
-            padding: 0.75rem 1rem;
-            border: 1px solid #e2e8f0;
-            background-color: #f8fafc;
-            font-weight: 500;
-        }
-        .form-control:focus, .form-select:focus {
-            background-color: #ffffff;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1) !important;
-        }
-
-        /* ปุ่มหมวดหมู่แบบโค้งมน น่ากด ไม่แข็งทื่อ */
-        .category-btn {
-            border-radius: 16px !important;
-            padding: 0.6rem 1.2rem;
-            font-weight: 600;
-            font-size: 0.875rem;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid transparent;
-        }
-        .category-btn:hover {
-            transform: scale(1.04);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        
-        .btn-indigo {
-            background: linear-gradient(135deg, #6366f1, #4f46e5);
-            color: white;
-            border-radius: 14px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            border: none;
-        }
-        .btn-indigo:hover {
-            background: linear-gradient(135deg, #4f46e5, #4338ca);
-            color: white;
-        }
-
-        /* แจ้งเตือน Toast สุดมินิมอล */
-        #toastNotification {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 1060;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        #toastNotification.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* ปรับแต่งความสวยงามในส่วนลิสต์ภารกิจ */
-        .goal-item {
-            border: none !important;
-            background-color: #f8fafc !important;
-            border-radius: 14px !important;
-            padding: 0.75rem 1rem !important;
-            margin-bottom: 0.5rem;
-            transition: all 0.2s;
-        }
-        .goal-item:hover {
-            background-color: #f1f5f9 !important;
-        }
-        /* ⏳ ม่านบังตาป้องกันหน้าแวบโชว์เลข 0 */
-        #authOverlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #f8fafc;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.2s ease-out;
-        }
+        .form-control, .form-select { border-radius: 14px !important; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; background-color: #f8fafc; font-weight: 500; }
+        .form-control:focus, .form-select:focus { background-color: #ffffff; border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1) !important; }
+        .category-btn { border-radius: 16px !important; padding: 0.6rem 1.2rem; font-weight: 600; font-size: 0.875rem; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid transparent; }
+        .category-btn:hover { transform: scale(1.04); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .btn-indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border-radius: 14px; padding: 0.75rem 1.5rem; font-weight: 600; border: none; }
+        .btn-indigo:hover { background: linear-gradient(135deg, #4f46e5, #4338ca); color: white; }
+        #toastNotification { position: fixed; bottom: 30px; right: 30px; z-index: 1060; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); opacity: 0; transform: translateY(20px); }
+        #toastNotification.show { opacity: 1; transform: translateY(0); }
+        .goal-item { border: none !important; background-color: #f8fafc !important; border-radius: 14px !important; padding: 0.75rem 1rem !important; margin-bottom: 0.5rem; transition: all 0.2s; }
+        .goal-item:hover { background-color: #f1f5f9 !important; }
+        #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #f8fafc; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.2s ease-out; }
     </style>
 </head>
-<body>
-
-    <body class="py-4">
+<body class="py-4">
 
     <div id="authOverlay">
         <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
@@ -257,15 +157,15 @@ if ('caches' in window) {
             </div>
         </div>
 
-        <div class="mb-3">
+        <div class="premium-card">
             <label class="form-label small fw-bold text-secondary">📷 สแกนสลิปโอนเงินอัจฉริยะ (ถ้ามี)</label>
             <input type="file" id="slipInput" accept="image/*" class="form-control form-control-sm rounded-3">
-            <div id="slipLoadingStatus" class="form-text text-primary d-none small">
+            <div id="slipLoadingStatus" class="form-text text-primary d-none small mt-2">
                 <span class="spinner-border spinner-border-sm me-1" role="status"></span> กำลังใช้ AI ถอดรหัสยอดเงินจากสลิปสักครู่...
             </div>
         </div>
 
-        <div id="recordBox" class="premium-card transition-all duration-300">
+        <div id="recordBox" class="premium-card">
             <h5 id="recordBoxTitle" class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-plus-square-fill text-success me-2"></i> บันทึกรายการใหม่</h5>
             <input type="hidden" id="editTxId" value="">
             
