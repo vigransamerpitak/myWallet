@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบคู่รักนักออม - Premium Minimalist Version</title>
+    <link rel="manifest" href="manifest.json">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="secrets.js" defer></script>
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
+    <script>
+        // 📱 สั่งถอนรากถอนโคน Service Worker และคลังแคชทั้งหมดเพื่อเคลียร์บั๊กหลอกตาถาวร
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker Unregistered successfully!');
+                }
+            });
+        }
+        if ('caches' in window) {
+            caches.keys().then(function(names) {
+                for (let name of names) caches.delete(name);
+                console.log('All Cache Storages Cleared!');
+            });
+        }
+
+        // ⏳ ตรวจสอบ Auth พร้อมระบบซ่อนม่านบังตา ป้องกันหน้าแวบโชว์เลข 0
+        async function checkUserAuth() {
+            setTimeout(async () => {
+                const { data } = await supabaseClient.auth.getSession();
+                if (!data.session) { 
+                    window.location.href = 'login.html'; 
+                } else { 
+                    initUserIdentity(data.session.user.id);
+                    
+                    // 🔥 ล็อกอินผ่านชัวร์แล้ว ค่อยสไลด์ปิดม่านบังตาออกละมุนๆ
+                    const overlay = document.getElementById('authOverlay');
+                    if (overlay) {
+                        overlay.style.opacity = '0';
+                        setTimeout(() => overlay.remove(), 200);
+                    }
+                }
+            }, 300);
+        }
+        checkUserAuth();
+    </script>
+    
+    <style>
+        body { background-color: #f8fafc; font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif; color: #334155; }
+        .premium-card { border: none !important; border-radius: 24px !important; box-shadow: 0 8px 24px rgba(148, 163, 184, 0.05), 0 1px 2px rgba(148, 163, 184, 0.02) !important; background-color: #ffffff; padding: 1.5rem !important; margin-bottom: 1.5rem; border: 1px solid rgba(226, 232, 240, 0.8) !important; }
+        .balance-card { border: none !important; border-radius: 20px !important; padding: 1.25rem 1rem !important; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+        .balance-card:hover { transform: translateY(-4px); box-shadow: 0 12px 20px rgba(148, 163, 184, 0.08) !important; }
+        .bg-my-wallet { background-color: #eff6ff; color: #1e6091; }
+        .bg-partner-wallet { background-color: #fff1f2; color: #e11d48; }
+        .bg-shared-wallet { background-color: #fef9c3; color: #854d0e; }
+        .bg-emergency-wallet { background-color: #ecfdf5; color: #065f46; border: 1px solid rgba(16, 185, 129, 0.2) !important; }
+        .form-control, .form-select { border-radius: 14px !important; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; background-color: #f8fafc; font-weight: 500; }
+        .form-control:focus, .form-select:focus { background-color: #ffffff; border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1) !important; }
+        .category-btn { border-radius: 16px !important; padding: 0.6rem 1.2rem; font-weight: 600; font-size: 0.875rem; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid transparent; }
+        .category-btn:hover { transform: scale(1.04); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .btn-indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border-radius: 14px; padding: 0.75rem 1.5rem; font-weight: 600; border: none; }
+        .btn-indigo:hover { background: linear-gradient(135deg, #4f46e5, #4338ca); color: white; }
+        #toastNotification { position: fixed; bottom: 30px; right: 30px; z-index: 1060; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); opacity: 0; transform: translateY(20px); }
+        #toastNotification.show { opacity: 1; transform: translateY(0); }
+        .goal-item { border: none !important; background-color: #f8fafc !important; border-radius: 14px !important; padding: 0.75rem 1rem !important; margin-bottom: 0.5rem; transition: all 0.2s; }
+        .goal-item:hover { background-color: #f1f5f9 !important; }
+        #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #f8fafc; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.2s ease-out; }
+    </style>
+</head>
+<body class="py-4">
+
+    <div id="authOverlay">
+        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+        <h6 class="fw-bold text-secondary">กำลังรักษาความปลอดภัยระบบ...</h6>
+    </div>
+
+    <div id="toastNotification" class="toast align-items-center text-white bg-dark border-0 p-3 d-flex shadow-lg rounded-4" role="alert">
+        <div class="d-flex w-100">
+            <div class="toast-body p-0 d-flex align-items-center">
+                <span id="toastIcon" class="fs-5 me-2">✨</span>
+                <span id="toastMessage" class="fw-semibold">ทำรายการสำเร็จ!</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container py-4" style="max-width: 940px;">
+        
+        <div class="d-flex justify-content-between align-items-center bg-white p-3 rounded-4 shadow-2xs mb-4 border border-light">
+            <span id="userDisplay" class="fw-bold text-dark d-flex align-items-center"><i class="bi bi-shield-check text-indigo fs-5 me-2"></i> กำลังตรวจสอบระบบความปลอดภัย...</span>
+            <button onclick="handleLogout()" class="btn btn-link text-secondary text-decoration-none btn-sm fw-medium">🚪 ออกจากระบบ</button>
+        </div>
+
+        <h1 class="text-center fw-extrabold text-dark mb-4" style="letter-spacing: -0.5px;">👩‍❤️‍👨 บันทึกรายรับ-รายจ่ายคู่รัก</h1>
+
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card balance-card bg-my-wallet h-100">
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าของฉัน 🙋‍♂️</p>
+                        <h4 id="myTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card balance-card bg-partner-wallet h-100">
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าของแฟน 🙋‍♀️</p>
+                        <h4 id="partnerTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card balance-card bg-shared-wallet h-100">
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">เงินกองกลางร่วมกัน 🤝</p>
+                        <h4 id="sharedTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card balance-card bg-emergency-wallet h-100">
+                    <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
+                        <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">เงินออมสำรองฉุกเฉิน 🎯</p>
+                        <h4 id="emergencyTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-md-6">
+                <div class="card text-white border-0 p-3 shadow-sm" style="background: linear-gradient(135deg, #4f46e5, #3730a3); border-radius: 24px; min-height: 215px;">
+                    <h6 class="fw-bold mb-2 d-flex align-items-center justify-content-center justify-content-md-start"><i class="bi bi-calculator-fill me-2"></i> บิลหารครึ่งประจำรอบเดือน</h6>
+                    <div class="p-2.5 bg-white bg-opacity-10 rounded-4 my-auto text-center">
+                        <div id="billSummaryText" class="small fw-medium mb-0">กำลังประมวลผลกระแสเงินสด...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <div class="card bg-white border-0 shadow-xs p-3" style="border-radius: 24px; border: 1px solid rgba(226, 232, 240, 0.8)!important; min-height: 215px;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-dark mb-0 d-flex align-items-center"><i class="bi bi-trophy-fill text-warning me-2"></i> Checklist ภารกิจเงิน</h6>
+                        <span id="checklistMonthLabel" class="badge bg-light text-secondary border-0 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;"></span>
+                    </div>
+                    <div id="goalsList" class="overflow-y-auto pe-1" style="max-height: 150px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="premium-card">
+            <label class="form-label small fw-bold text-secondary">📷 สแกนสลิปโอนเงินอัจฉริยะ (ถ้ามี)</label>
+            <input type="file" id="slipInput" accept="image/*" class="form-control form-control-sm rounded-3">
+            <div id="slipLoadingStatus" class="form-text text-primary d-none small mt-2">
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span> กำลังใช้ AI ถอดรหัสยอดเงินจากสลิปสักครู่...
+            </div>
+        </div>
+
+        <div id="recordBox" class="premium-card">
+            <h5 id="recordBoxTitle" class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-plus-square-fill text-success me-2"></i> บันทึกรายการใหม่</h5>
+            <input type="hidden" id="editTxId" value="">
+            
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-4">
+                    <label for="txAmount" class="form-label small fw-bold text-secondary mb-1">จำนวนเงิน (บาท)</label>
+                    <input type="number" id="txAmount" step="0.01" inputmode="decimal" placeholder="0.00" class="form-control form-control-lg fw-bold text-dark">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="txNote" class="form-label small fw-bold text-secondary mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
+                    <input type="text" id="txNote" placeholder="กินชาบู, ซื้อของเข้าคอนโด" class="form-control form-control-lg">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="txOwner" class="form-label small fw-bold text-secondary mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน?</label>
+                    <select id="txOwner" class="form-select form-control-lg fw-bold border-indigo text-indigo">
+                        <option value="me">🙋‍♂️ ของฉันคนเดียว (เงินส่วนตัว)</option>
+                        <option value="partner">🙋‍♀️ ของแฟนคนเดียว (เงินส่วนตัว)</option>
+                        <option value="shared-me">🤝 กองกลาง (ฉันควักจ่ายไปก่อน)</option>
+                        <option value="shared-partner">🤝 กองกลาง (แฟนควักจ่ายไปก่อน)</option>
+                        <option value="emergency">🚨 ถอน/ฝาก เข้าเงินออมฉุกเฉิน</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="editActionArea" class="d-none alert alert-warning p-3 rounded-4 d-flex justify-content-between align-items-center mb-4 border-0 shadow-sm">
+                <span class="small fw-bold text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-1"></i> อยู่ในโหมดแก้ไขข้อมูลเก่าย้อนหลัง</span>
+                <div>
+                    <button onclick="cancelEditMode()" class="btn btn-light btn-sm me-2 rounded-3 fw-medium">ยกเลิก</button>
+                    <button onclick="submitEditTransaction()" class="btn btn-warning btn-sm text-dark fw-bold rounded-3 px-3">💾 บันทึกการแก้ไข</button>
+                </div>
+            </div>
+
+            <div id="categoryActionArea">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-danger mb-2">🔴 หมวดหมู่รายจ่าย (คลิกเลือกเพื่อบันทึกทันที)</label>
+                    <div id="expenseButtons" class="d-flex flex-wrap gap-2"></div>
+                </div>
+                <div>
+                    <label class="form-label small fw-bold text-success mb-2">🟢 หมวดหมู่รายรับ (คลิกเลือกเพื่อบันทึกทันที)</label>
+                    <div id="incomeButtons" class="d-flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="premium-card">
+            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-pencil-fill text-indigo me-2"></i> เพิ่มภารกิจใหม่ประจำเดือนปัจจุบัน</h5>
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label for="newGoalTitle" class="form-label small fw-bold text-secondary mb-1">ชื่อภารกิจการเงิน</label>
+                    <input type="text" id="newGoalTitle" placeholder="เช่น ทริปหัวหิน, ค่าไฟห้อง" class="form-control">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="newGoalAmount" class="form-label small fw-bold text-secondary mb-1">เป้าหมายจำนวนเงิน (บาท)</label>
+                    <input type="number" id="newGoalAmount" placeholder="0.00" class="form-control">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="newGoalType" class="form-label small fw-bold text-secondary mb-1">ประเภทภารกิจ</label>
+                    <select id="newGoalType" class="form-select">
+                        <option value="save">🎯 ภารกิจ [ออมเงินเข้าคลังฉุกเฉิน]</option>
+                        <option value="bill">📄 ภารกิจ [บิลรายจ่ายส่วนกลางประจำ]</option>
+                    </select>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+                <button onclick="createNewGoalFrontend()" class="btn btn-indigo px-4 py-2 shadow-xs">➕ เพิ่มภารกิจลงหน้าจอ</button>
+            </div>
+        </div>
+
+        <div class="premium-card">
+            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-pie-chart-fill text-danger me-2"></i> สัดส่วนการใช้เงินเยอะ-น้อยประจำเดือน</h5>
+            <div id="analyticsArea" class="row g-3"></div>
+        </div>
+
+        <div class="premium-card">
+            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-layout-text-window-reverse text-secondary me-2"></i> คลังประวัติรายการเงินและตัวคัดกรอง</h5>
+            
+            <div class="row g-3 bg-light p-3 rounded-4 mb-4 align-items-end border-0">
+                <div class="col-12 col-md-4">
+                    <label for="filterOwner" class="form-label small fw-bold text-secondary mb-1">👤 ตัวกรองผู้ใช้ / กระเป๋า</label>
+                    <select id="filterOwner" onchange="updateFilters()" class="form-select text-sm bg-white">
+                        <option value="all">🌍 ทุกกระเป๋า / รวมทั้งหมด</option>
+                        <option value="me">🙋‍♂️ เฉพาะของฉัน</option>
+                        <option value="partner">🙋‍♀️ เฉพาะของแฟน</option>
+                        <option value="shared">🤝 เฉพาะส่วนกลางทั้งหมด</option>
+                        <option value="emergency">🎯 เฉพาะเงินออมฉุกเฉิน</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="filterType" class="form-label small fw-bold text-secondary mb-1">🔄 ตัวกรองประเภท</label>
+                    <select id="filterType" onchange="updateFilters()" class="form-select text-sm bg-white">
+                        <option value="all">🔄 ทั้งรายรับ & รายจ่าย</option>
+                        <option value="expense">🔴 เฉพาะรายจ่าย</option>
+                        <option value="income">🟢 เฉพาะรายรับ</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="filterDate" class="form-label small fw-bold text-secondary mb-1">📅 ตัวกรองบริหารแยกเดือน</label>
+                    <select id="filterDate" onchange="updateFilters()" class="form-select text-sm bg-white fw-bold text-primary">
+                        <option value="this-month" selected>📅 เฉพาะเดือนนี้</option>
+                        <option value="last-month">⏳ เฉพาะเดือนที่แล้ว</option>
+                        <option value="all">♾️ แสดงทลายถังทั้งหมด</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr class="table-light text-secondary small">
+                            <th class="py-3">วัน-เวลา</th>
+                            <th class="py-3">กระเป๋า</th>
+                            <th class="py-3">ประเภท</th>
+                            <th class="py-3">หมวดหมู่</th>
+                            <th class="py-3">จำนวนเงิน</th>
+                            <th class="py-3">บันทึก</th>
+                            <th class="py-3 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionTableBody" class="text-dark"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

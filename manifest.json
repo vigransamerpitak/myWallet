@@ -1,0 +1,17 @@
+{
+  "name": "Couple Wallet & Savings App",
+  "short_name": "คู่รักนักออม",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/8358/8358116.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}
