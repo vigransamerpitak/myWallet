@@ -1,4 +1,4 @@
-// app.js - Phase 1 Master Version (Full Frontend Automation & Beautiful UI Supported)
+// app.js - Phase 1 Final Production Version (Smart Form Reset & Beautiful Error Handling)
 
 let filterOwner = 'all';
 let filterType = 'all';
@@ -14,11 +14,11 @@ function initUserIdentity(userId) {
     if (userId === '4ffee1dd-ff34-47c0-a623-7dcc76d80c0f') {
         currentUserRole = 'me';
         userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">คุณเดฟ (แอดมิน)</span>`;
-        txOwnerInput.value = 'me'; // ล็อกกระเป๋าส่วนตัวของฉันเป็นค่าเริ่มต้น
+        if (txOwnerInput) txOwnerInput.value = 'me'; // ล็อกกระเป๋าส่วนตัวของฉันเป็นค่าเริ่มต้น
     } else {
         currentUserRole = 'partner';
         userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">คุณแฟนคนสวย</span>`;
-        txOwnerInput.value = 'partner'; // ล็อกกระเป๋าส่วนตัวของแฟนเป็นค่าเริ่มต้น
+        if (txOwnerInput) txOwnerInput.value = 'partner'; // ล็อกกระเป๋าส่วนตัวของแฟนเป็นค่าเริ่มต้น
     }
 }
 
@@ -43,12 +43,25 @@ async function updateFilters() {
     await loadTransactions();
 }
 
-function showToast(message, icon = '✨') {
+// 🎨 ซ่อมระบบแจ้งเตือนให้รองรับทั้งความสำเร็จและ Error แบบละมุนตา ไม่ระเบิด Alert ดิบ
+function showToast(message, icon = '✨', isError = false) {
     const toast = document.getElementById('toastNotification');
-    document.getElementById('toastIcon').innerText = icon;
-    document.getElementById('toastMessage').innerText = message;
+    const toastIcon = document.getElementById('toastIcon');
+    const toastMessage = document.getElementById('toastMessage');
+    
+    toastIcon.innerText = icon;
+    toastMessage.innerText = message;
+    
+    if (isError) {
+        toast.classList.remove('bg-dark');
+        toast.style.backgroundColor = '#dc3545'; // สีแดงแจ้งเตือน Error มินิมอล
+    } else {
+        toast.style.backgroundColor = '';
+        toast.classList.add('bg-dark'); // สีเข้มปกติความสำเร็จ
+    }
+    
     toast.classList.add('show');
-    setTimeout(() => { toast.classList.remove('show'); }, 2500);
+    setTimeout(() => { toast.classList.remove('show'); }, 3000);
 }
 
 async function loadCategories() {
@@ -77,10 +90,10 @@ async function saveTransaction(categoryName, type) {
     const noteInput = document.getElementById('txNote');
     const ownerInput = document.getElementById('txOwner');
     
-    if (!ownerInput.value) return alert('กรุณาเลือกกระเป๋าเงินด้วยครับ');
+    if (!ownerInput.value) return showToast('กรุณาเลือกกระเป๋าเงินด้วยครับ', '⚠️', true);
 
     const amount = parseFloat(amountInput.value);
-    if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่');
+    if (isNaN(amount) || amount <= 0) return showToast('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่', '🔢', true);
     const finalAmount = parseFloat(amount.toFixed(2));
 
     const { error } = await supabaseClient
@@ -88,12 +101,12 @@ async function saveTransaction(categoryName, type) {
         .insert([{ amount: finalAmount, type: type, category_name: categoryName, note: noteInput.value.trim() || null, owner: ownerInput.value }]);
 
     if (error) {
-        alert(error.message);
+        showToast(`บันทึกไม่สำเร็จ: ${error.message}`, '❌', true);
     } else {
         amountInput.value = '';
         noteInput.value = '';
         
-        // ค้างค่ากระเป๋าเริ่มต้นไว้ที่กระเป๋าส่วนตัวของคนที่จดเงินตลอดเวลา
+        // 🧠 ระบบเคลียร์ฟอร์มอัจฉริยะ: ค้างค่าดร็อปดาวน์ไว้ที่ "กระเป๋าส่วนตัว" ของตัวเองหลังจดเสร็จเสมอ ป้องกันการลืมเปลี่ยนกลับ
         ownerInput.value = currentUserRole === 'me' ? 'me' : 'partner';
         
         showToast('จดบันทึกเรียบร้อยแล้วจ้า! 💰', '✅');
@@ -123,12 +136,13 @@ function cancelEditMode() {
     document.getElementById('txAmount').value = '';
     document.getElementById('txNote').value = '';
     
+    // 🧠 กดยกเลิกปั๊บ ดีดกลับมากระเป๋าส่วนตัวออโต้
     document.getElementById('txOwner').value = currentUserRole === 'me' ? 'me' : 'partner';
     
     const recordBox = document.getElementById('recordBox');
     recordBox.style.backgroundColor = '#ffffff';
     recordBox.style.borderColor = 'transparent';
-    document.getElementById('recordBoxTitle').innerHTML = '<i class="bi bi-pencil-square text-success me-1"></i> บันทึกรายการใหม่';
+    document.getElementById('recordBoxTitle').innerHTML = '<i class="bi bi-plus-square-fill text-success me-2"></i> บันทึกรายการใหม่';
 
     document.getElementById('categoryActionArea').classList.remove('d-none');
     document.getElementById('editActionArea').classList.add('d-none');
@@ -140,14 +154,14 @@ async function submitEditTransaction() {
     const note = document.getElementById('txNote').value.trim();
     const owner = document.getElementById('txOwner').value;
 
-    if (!owner) return alert('กรุณาเลือกกระเป๋าเงินด้วยครับ');
-    if (isNaN(amount) || amount <= 0) return alert('กรุณากรอกยอดเงินให้ถูกต้อง');
+    if (!owner) return showToast('กรุณาเลือกกระเป๋าเงินด้วยครับ', '⚠️', true);
+    if (isNaN(amount) || amount <= 0) return showToast('กรุณากรอกยอดเงินให้ถูกต้อง', '🔢', true);
     const finalAmount = parseFloat(amount.toFixed(2));
 
     const { error } = await supabaseClient.from('transactions').update({ amount: finalAmount, note: note || null, owner: owner }).eq('id', id);
     
     if (error) {
-        alert('แก้ไขล้มเหลว: ' + error.message);
+        showToast(`แก้ไขล้มเหลว: ${error.message}`, '❌', true);
     } else {
         cancelEditMode();
         showToast('อัปเดตข้อมูลแก้ไขเรียบร้อยแล้ว!', '💾');
@@ -158,7 +172,12 @@ async function submitEditTransaction() {
 async function deleteTransaction(id) {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบประวัติรายการเงินแถวนี้ทิ้งอย่างถาวร?')) return;
     const { error } = await supabaseClient.from('transactions').delete().eq('id', id);
-    if (error) alert('ลบไม่สำเร็จ: ' + error.message); else { showToast('ลบรายการเงินทิ้งเรียบร้อย', '🗑️'); await loadTransactions(); }
+    if (error) {
+        showToast(`ลบไม่สำเร็จ: ${error.message}`, '❌', true);
+    } else { 
+        showToast('ลบรายการเงินทิ้งเรียบร้อย', '🗑️'); 
+        await loadTransactions(); 
+    }
 }
 
 async function createNewGoalFrontend() {
@@ -169,7 +188,7 @@ async function createNewGoalFrontend() {
     const title = titleInput.value.trim();
     const amount = parseFloat(amountInput.value);
     
-    if (!title || isNaN(amount) || amount <= 0) return alert('กรุณากรอกชื่อเควสและยอดเงินตั้งเป้าหมายให้ถูกต้องครับ');
+    if (!title || isNaN(amount) || amount <= 0) return showToast('กรุณากรอกชื่อเควสและยอดเงินตั้งเป้าหมายให้ถูกต้องครับ', '⚠️', true);
 
     const now = new Date();
     const targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -179,7 +198,7 @@ async function createNewGoalFrontend() {
         .insert([{ title: title, amount: amount, type: typeInput.value, goal_month: targetMonthStr, is_completed: false, is_failed: false }]);
 
     if (error) {
-        alert(error.message);
+        showToast(`เพิ่มภารกิจล้มเหลว: ${error.message}`, '❌', true);
     } else {
         titleInput.value = ''; amountInput.value = '';
         showToast('เพิ่มภารกิจลงหน้าจอสำเร็จแล้ว!', '➕');
@@ -268,7 +287,7 @@ async function settleGoal(id, status, title, amount, type) {
         if (!confirm(`ยืนยันทำเควสสำเร็จ: "${title}"?\nระบบจะสร้างธุรกรรมออม/จ่ายเงินให้อัตโนมัติ`)) return;
         
         const { error } = await supabaseClient.from('goals').update({ is_completed: true, is_failed: false }).eq('id', id);
-        if (error) return alert(error.message);
+        if (error) return showToast(error.message, '❌', true);
 
         const finalAmount = parseFloat(parseFloat(amount).toFixed(2));
         const currentSharedOwner = currentUserRole === 'me' ? 'shared-me' : 'shared-partner';
@@ -283,7 +302,7 @@ async function settleGoal(id, status, title, amount, type) {
     } else {
         if (!confirm(`เดือนนี้ล้มเหลว/ข้ามภารกิจ: "${title}" ใช่ไหม?`)) return;
         const { error } = await supabaseClient.from('goals').update({ is_completed: false, is_failed: true }).eq('id', id);
-        if (error) return alert(error.message);
+        if (error) return showToast(error.message, '❌', true);
         showToast('บันทึกสถิติข้ามเควสแล้ว ❌', '📁');
     }
 
@@ -295,7 +314,7 @@ async function resetGoalStatus(id, title) {
     if (!confirm(`คุณต้องการยกเลิกสถานะของภารกิจ "${title}" เพื่อกลับไปเลือกกดติ๊กถูก/กากบาทใหม่ ใช่หรือไม่?`)) return;
     
     const { error } = await supabaseClient.from('goals').update({ is_completed: false, is_failed: false }).eq('id', id);
-    if (error) return alert(error.message);
+    if (error) return showToast(error.message, '❌', true);
     
     showToast('รีเซ็ตสถานะภารกิจกลับคืนเรียบร้อย', '↩️');
     await loadGoals();
@@ -304,7 +323,12 @@ async function resetGoalStatus(id, title) {
 async function deleteGoalFrontend(id) {
     if (!confirm('ต้องการลบภารกิจนี้ออกจากหน้าจอใช่ไหมครับ?')) return;
     const { error } = await supabaseClient.from('goals').delete().eq('id', id);
-    if (error) alert(error.message); else { showToast('ลบภารกิจออกแล้ว', '🗑️'); await loadGoals(); }
+    if (error) {
+        showToast(error.message, '❌', true);
+    } else { 
+        showToast('ลบภารกิจออกแล้ว', '🗑️'); 
+        await loadGoals(); 
+    }
 }
 
 async function loadTransactions() {
@@ -394,19 +418,18 @@ async function loadTransactions() {
     document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
     document.getElementById('emergencyTotal').innerText = `${emergencyTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
 
-    const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared;
-// 🛠️ ปรับลอจิกการแสดงผลบิลหารครึ่ง ไม่ให้กล่องดีดหายเวลาบันทึกเงินส่วนตัว
+    // 🛠️ ปรับลอจิกบิลหารครึ่ง: จัดกลุ่มแบบสมมาตร ปลอดภัยแม้ไม่มีข้อมูลกองกลาง
     const billTextEl = document.getElementById('billSummaryText');
 
     if (totalMePaidShared === 0 && totalPartnerPaidShared === 0) {
         billTextEl.innerHTML = `
             <div class="text-center py-2">
                 🎉 ยังไม่มีรายจ่ายกองกลางร่วมกันในเดือนนี้<br>
-                <span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะหารครึ่งให้ทันทีเมื่อจดรายการที่ผูกกับกระเป๋า "กองกลาง")</span>
+                <span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะช่วยหารครึ่งทันทีเมื่อจดรายการผ่านกระเป๋า "กองกลาง")</span>
             </div>
         `;
     } else {
-        const grandSharedExpense = totalMePaidShared + totalPartnerPartnerShared || (totalMePaidShared + totalPartnerPaidShared);
+        const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared;
         const halfShare = grandSharedExpense / 2;
         let settlementResultText = "";
 
@@ -415,7 +438,7 @@ async function loadTransactions() {
             settlementResultText = `🙋‍♀️ แฟนต้องโอนคืนให้คุณ: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
         } else if (totalPartnerPaidShared > totalMePaidShared) {
             const diff = totalPartnerPaidShared - halfShare;
-            settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold text-danger-emphasis fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
+            settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
         } else {
             settlementResultText = `🤝 ยอดออกเงินคนละครึ่งเท่ากันเป๊ะ พอดิบพอดีจ้า!`;
         }
