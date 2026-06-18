@@ -55,7 +55,7 @@ function compressImage(file) {
     });
 }
 
-// 🤖 ระบบสแกนสลิปอัจฉริยะควบโครงสร้างมัดแน่นสไตล์ Gemini 1.5 Flash ล่าสุด
+// app.js (ท่อนดักจับสแกนสลิปเวอร์ชันดึงคีย์ออโต้จาก Supabase)
 function setupSlipScannerListener() {
     const slipInput = document.getElementById('slipInput');
     if (!slipInput) return;
@@ -68,15 +68,23 @@ function setupSlipScannerListener() {
         statusEl.classList.remove('d-none');
 
         try {
-            // 1. ตรวจเช็คว่ามีคีย์ระบบดึงมาใช้งานหรือยัง
-            if (typeof GEMINI_API_KEY === 'undefined' || !GEMINI_API_KEY) {
-                throw new Error("หา API Key ในไฟล์ secrets.js ไม่เจอ กรุณารีเช็คไฟล์สิทธิ์หลังบ้านครับ");
-            }
+            // 🔄 1. ดึงคีย์ลับจาก Supabase มาใช้งานแบบ Real-time (หน้าบ้านไม่ต้องกรอกเอง)
+            const { data: secretData, error: secretError } = await supabaseClient
+                .from('system_secrets')
+                .select('key_value')
+                .eq('key_name', 'GEMINI_API_KEY')
+                .single();
 
-            // 2. ย่อรูปสลิปทันที
+            if (secretError || !secretData) {
+                throw new Error("ระบบหา API Key ในฐานข้อมูลไม่เจอ กรุณาเช็คตาราง system_secrets ครับ");
+            }
+            
+            const liveGeminiKey = secretData.key_value;
+
+            // 2. บีบอัดรูปภาพ
             const compressedFile = await compressImage(file);
 
-            // 3. อัปโหลดเข้าถังพักชั่วคราว Supabase Storage (Bucket: slips)
+            // 3. อัปโหลดเข้าถังพักชั่วคราว Supabase Storage
             const fileExt = compressedFile.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
             
@@ -87,14 +95,15 @@ function setupSlipScannerListener() {
 
             if (uploadError) throw uploadError;
 
-            // 4. แปลงภาพสลิปส่วนนี้เป็น Base64 ส่งให้ Gemini ถอดรหัสโครงสร้างมัดแน่น
+            // 4. แปลงภาพสลิปเป็น Base64
             const base64Data = await new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(compressedFile);
                 reader.onloadend = () => resolve(reader.result.split(',')[1]);
             });
 
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+            // 5. ส่งให้ Gemini ทำงานโดยใช้คีย์ที่เราดึงมาจาก Supabase เมื่อกี้
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${liveGeminiKey}`;
             const promptPayload = {
                 contents: [{
                     parts: [
@@ -117,7 +126,7 @@ function setupSlipScannerListener() {
             const aiText = resData.candidates[0].content.parts[0].text.trim();
             const result = JSON.parse(aiText);
 
-            // 5. ป้อนยอดเงินเข้าแบบฟอร์มออโต้
+            // 6. ใส่ยอดเงินเข้าฟอร์มออโต้
             document.getElementById('txAmount').value = parseFloat(result.amount).toFixed(2);
             document.getElementById('txNote').value = `[SLIP_URL:${fileName}] รอคุณระบุชื่อรายการจริง`;
             
