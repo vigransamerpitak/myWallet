@@ -16,6 +16,13 @@
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
     <script>
+// 📱 โค้ดเดิม: ลงทะเบียน PWA เพื่อให้แอปเซฟลงหน้าจอมือถือได้ (เก็บไว้ดีแล้วครับ)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(() => console.log('PWA Registered!'));
+        }
+
+        // ⏳ โค้ดใหม่: ตรวจสอบ Auth พร้อมระบบซ่อนม่านบังตา ป้องกันหน้าแวบโชว์เลข 0
         async function checkUserAuth() {
             setTimeout(async () => {
                 const { data } = await supabaseClient.auth.getSession();
@@ -23,15 +30,18 @@
                     window.location.href = 'login.html'; 
                 } else { 
                     initUserIdentity(data.session.user.id);
+                    
+                    // 🔥 ล็อกอินผ่านชัวร์แล้ว ค่อยสไลด์ปิดม่านบังตาออกละมุนๆ
+                    const overlay = document.getElementById('authOverlay');
+                    if (overlay) {
+                        overlay.style.opacity = '0';
+                        setTimeout(() => overlay.remove(), 200); // ลบแท็กทิ้งหลังจากจางหายไปแล้ว
+                    }
                 }
             }, 300);
         }
         checkUserAuth();
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(() => console.log('PWA Registered!'));
-        }
+        
     </script>
     
     <style>
@@ -138,9 +148,28 @@
         .goal-item:hover {
             background-color: #f1f5f9 !important;
         }
+        /* ⏳ ม่านบังตาป้องกันหน้าแวบโชว์เลข 0 */
+        #authOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f8fafc;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s ease-out;
+        }
     </style>
 </head>
 <body>
+
+    <body class="py-4">
+
+    <div id="authOverlay">
+        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+        <h6 class="fw-bold text-secondary">กำลังรักษาความปลอดภัยระบบ...</h6>
+    </div>
 
     <div id="toastNotification" class="toast align-items-center text-white bg-dark border-0 p-3 d-flex shadow-lg rounded-4" role="alert">
         <div class="d-flex w-100">
