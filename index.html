@@ -245,6 +245,14 @@
             </div>
         </div>
 
+        <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">📷 สแกนสลิปโอนเงินอัจฉริยะ (ถ้ามี)</label>
+            <input type="file" id="slipInput" accept="image/*" class="form-control form-control-sm rounded-3">
+            <div id="slipLoadingStatus" class="form-text text-primary d-none small">
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span> กำลังใช้ AI ถอดรหัสยอดเงินจากสลิปสักครู่...
+            </div>
+        </div>
+
         <div id="recordBox" class="premium-card transition-all duration-300">
             <h5 id="recordBoxTitle" class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-plus-square-fill text-success me-2"></i> บันทึกรายการใหม่</h5>
             <input type="hidden" id="editTxId" value="">
