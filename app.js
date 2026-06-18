@@ -21,9 +21,14 @@ function initUserIdentity(userId) {
 
 window.onload = function() {
     setTimeout(async () => {
-        setupSlipScannerListener(); // เปิดระบบดักจับและส่งสลิปให้ AI ประมวลผล
-        await loadCategories();
-        await updateFilters();
+        try {
+            setupSlipScannerListener(); // เปิดระบบดักจับและส่งสลิปให้ AI ประมวลผล
+            // โหลดหมวดหมู่ และ โหลดตารางรายการเงินไปพร้อมๆ กัน ไม่ต้องรอคิว
+            await Promise.all([loadCategories(), updateFilters()]);
+        } catch (err) {
+            console.error("Initialization Error:", err);
+            showToast("เกิดข้อผิดพลาดในการโหลดข้อมูลเริ่มต้น กรุณารีเฟรชหน้าเว็บ", "⚠️", true);
+        }
     }, 400);
 }
 
@@ -141,13 +146,22 @@ function setupSlipScannerListener() {
     });
 }
 
-async function handleLogout() { await supabaseClient.auth.signOut(); window.location.href = 'login.html'; }
+async function handleLogout() { 
+    try {
+        await supabaseClient.auth.signOut(); 
+    } catch (err) {
+        console.error("Logout Error:", err);
+    } finally {
+        window.location.href = 'login.html'; 
+    }
+}
 
 async function updateFilters() {
     filterOwner = document.getElementById('filterOwner').value;
     filterType = document.getElementById('filterType').value;
     filterDate = document.getElementById('filterDate').value;
-    await loadGoals(); await loadTransactions();
+    // โหลดเป้าหมาย และ ธุรกรรม ไปพร้อมๆ กันเพื่อลดเวลาการรอคอย
+    await Promise.all([loadGoals(), loadTransactions()]);
 }
 
 function showToast(message, icon = '✨', isError = false) {

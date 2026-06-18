@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js" defer></script>
+    <script src="config.js"></script>
     <script src="app.js" defer></script>
     <script>
         // 📱 สั่งถอนรากถอนโคน Service Worker และคลังแคชทั้งหมดเพื่อเคลียร์บั๊กหลอกตาถาวร
@@ -32,9 +32,15 @@
             });
         }
 
-        // ⏳ ตรวจสอบ Auth พร้อมระบบซ่อนม่านบังตา ป้องกันหน้าแวบโชว์เลข 0
+        // ⏳ ตรวจสอบ Auth หลังจากระบบ Supabase สตาร์ทเครื่องติดแล้ว
         async function checkUserAuth() {
             setTimeout(async () => {
+                // เช็คว่าระบบก๊อกน้ำเปิดหรือยัง ป้องกัน Error พ่นใส่หน้าจอ
+                if (typeof supabaseClient === 'undefined') {
+                    console.error("⚠️ ก๊อกน้ำ Supabase ยังไม่ถูกเปิดใช้ กรุณาตรวจสอบไฟล์ config.js ครับ");
+                    return;
+                }
+                
                 const { data } = await supabaseClient.auth.getSession();
                 if (!data.session) { 
                     window.location.href = 'login.html'; 
@@ -48,7 +54,7 @@
                         setTimeout(() => overlay.remove(), 200);
                     }
                 }
-            }, 300);
+            }, 500); // เพิ่มดีเลย์นิ๊ดนึงให้มั่นใจว่าไฟล์ config.js แตกตัวเสร็จเรียบร้อย
         }
         checkUserAuth();
     </script>
