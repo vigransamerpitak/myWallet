@@ -18,35 +18,21 @@
     <script src="app.js" defer></script>
     <script>
 // 📱 ระบบลงทะเบียน PWA อัจฉริยะ (ตรวจจับเวอร์ชันใหม่แล้วบังคับล้างแคชทันที)
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(reg => {
-                    console.log('PWA Registered!');
-                    
-                    // ดักจับเมื่อมีการอัปเดตไฟล์บน GitHub Pages
-                    reg.onupdatefound = () => {
-                        const installingWorker = reg.installing;
-                        installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed') {
-                                if (navigator.serviceWorker.controller) {
-                                    // 🚀 เจอเวอร์ชันใหม่! สั่งล้างแคชและรีเฟรชหน้าเว็บอัตโนมัติ 1 รอบทันที
-                                    console.log('New update available! Clearing cache and reloading...');
-                                    
-                                    if (caches) {
-                                        caches.keys().then(names => {
-                                            for (let name of names) caches.delete(name);
-                                        });
-                                    }
-                                    
-                                    setTimeout(() => {
-                                        window.location.reload();
-                                    }, 500);
-                                }
-                            }
-                        };
-                    };
-                }).catch(err => console.error('PWA Registration failed:', err));
+ // 📱 สั่งถอนรากถอนโคน Service Worker และคลังแคชทั้งหมดเพื่อเคลียร์บั๊กหลอกตา
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+            registration.unregister();
+            console.log('Service Worker Unregistered successfully!');
         }
+    });
+}
+if ('caches' in window) {
+    caches.keys().then(function(names) {
+        for (let name of names) caches.delete(name);
+        console.log('All Cache Storages Cleared!');
+    });
+}
 
         // ⏳ โค้ดใหม่: ตรวจสอบ Auth พร้อมระบบซ่อนม่านบังตา ป้องกันหน้าแวบโชว์เลข 0
         async function checkUserAuth() {
