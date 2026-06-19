@@ -71,6 +71,12 @@ function syncEmergencyLabels() {
     if (filterEmergency) {
         filterEmergency.innerText = `🎯 เฉพาะ${saved}`;
     }
+
+    // 4. อัปเดตหัวข้อของกราฟสะสมเงินออม
+    const labelChartEmergency = document.getElementById('labelChartEmergency');
+    if (labelChartEmergency) {
+        labelChartEmergency.innerText = saved;
+    }
 }
 
 function getGoalIcon(type) {
