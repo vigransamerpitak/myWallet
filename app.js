@@ -3,7 +3,7 @@
 let filterOwner = 'all';
 let filterType = 'all';
 let filterDate = 'this-month';
-let currentUserRole = 'me'; 
+let currentUserRole = 'me';
 
 function initUserIdentity(userId) {
     const userDisplay = document.getElementById('userDisplay');
@@ -19,7 +19,7 @@ function initUserIdentity(userId) {
     }
 }
 
-window.onload = function() {
+window.onload = function () {
     setTimeout(async () => {
         try {
             setupSlipScannerListener(); // เปิดระบบดักจับและส่งสลิปให้ AI ประมวลผล
@@ -51,7 +51,7 @@ function compressImage(file) {
                 canvas.width = width; canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-                
+
                 ctx.canvas.toBlob((blob) => {
                     resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
                 }, 'image/jpeg', 0.7);
@@ -83,7 +83,7 @@ function setupSlipScannerListener() {
             if (secretError || !secretData) {
                 throw new Error("ระบบหา API Key ในฐานข้อมูลไม่เจอ กรุณาเช็คตาราง system_secrets ครับ");
             }
-            
+
             const liveGeminiKey = secretData.key_value;
 
             // 2. บีบอัดรูปภาพ
@@ -92,7 +92,7 @@ function setupSlipScannerListener() {
             // 3. อัปโหลดเข้าถังพักชั่วคราว Supabase Storage
             const fileExt = compressedFile.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-            
+
             const { data: uploadData, error: uploadError } = await supabaseClient
                 .storage
                 .from('slips')
@@ -108,7 +108,7 @@ function setupSlipScannerListener() {
             });
 
             // 5. ส่งให้ Gemini ทำงานโดยใช้คีย์ที่เราดึงมาจาก Supabase เมื่อกี้
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${liveGeminiKey}`;
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${liveGeminiKey}`;
             const promptPayload = {
                 contents: [{
                     parts: [
@@ -133,14 +133,14 @@ function setupSlipScannerListener() {
                     let waitSec = 30;
                     const retryMatch = JSON.stringify(resData).match(/retry in ([\d.]+)s/i);
                     if (retryMatch) waitSec = Math.ceil(parseFloat(retryMatch[1]));
-                    
+
                     showToast(`⏳ API เกินโควต้าชั่วคราว รอ ${waitSec} วินาทีแล้วลองใหม่ครั้งที่ ${attempt + 1}...`, '🔄');
                     await new Promise(r => setTimeout(r, waitSec * 1000));
                     continue;
                 }
                 break; // สำเร็จหรือ error อื่นที่ไม่ใช่ 429
             }
-            
+
             if (!resData.candidates || resData.candidates.length === 0) {
                 throw new Error(resData.error?.message || "Google Gemini ปฏิเสธการแกะโครงสร้างสลิปใบนี้");
             }
@@ -151,7 +151,7 @@ function setupSlipScannerListener() {
             // 6. ใส่ยอดเงินเข้าฟอร์มออโต้
             document.getElementById('txAmount').value = parseFloat(result.amount).toFixed(2);
             document.getElementById('txNote').value = `[SLIP_URL:${fileName}] รอคุณระบุชื่อรายการจริง`;
-            
+
             showToast('AI แกะยอดเงินจากสลิปเรียบร้อยแล้วจ้า! กรุณากดเลือกกระเป๋าเงินและปุ่มหมวดหมู่เพื่อบันทึกต่อได้เลย', '🤖');
 
         } catch (err) {
@@ -163,13 +163,13 @@ function setupSlipScannerListener() {
     });
 }
 
-async function handleLogout() { 
+async function handleLogout() {
     try {
-        await supabaseClient.auth.signOut(); 
+        await supabaseClient.auth.signOut();
     } catch (err) {
         console.error("Logout Error:", err);
     } finally {
-        window.location.href = 'login.html'; 
+        window.location.href = 'login.html';
     }
 }
 
@@ -186,7 +186,7 @@ function showToast(message, icon = '✨', isError = false) {
     const toastIcon = document.getElementById('toastIcon');
     const toastMessage = document.getElementById('toastMessage');
     toastIcon.innerText = icon; toastMessage.innerText = message;
-    if (isError) { toast.classList.remove('bg-dark'); toast.style.backgroundColor = '#dc3545'; } 
+    if (isError) { toast.classList.remove('bg-dark'); toast.style.backgroundColor = '#dc3545'; }
     else { toast.style.backgroundColor = ''; toast.classList.add('bg-dark'); }
     toast.classList.add('show'); setTimeout(() => { toast.classList.remove('show'); }, 3000);
 }
@@ -211,7 +211,7 @@ async function saveTransaction(categoryName, type) {
     const noteInput = document.getElementById('txNote');
     const ownerInput = document.getElementById('txOwner');
     const slipInput = document.getElementById('slipInput');
-    
+
     if (!ownerInput.value) return showToast('กรุณาเลือกกระเป๋าเงินด้วยครับ', '⚠️', true);
     const amount = parseFloat(amountInput.value);
     if (isNaN(amount) || amount <= 0) return showToast('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่', '🔢', true);
@@ -225,7 +225,7 @@ async function saveTransaction(categoryName, type) {
         finalCategory = "สลิปรอระบุหมวดหมู่";
     }
 
-    if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: me] ${finalNote}` : `[จ่ายโดย: me]`; } 
+    if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: me] ${finalNote}` : `[จ่ายโดย: me]`; }
     else if (dbOwner === 'shared-partner') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: partner] ${finalNote}` : `[จ่ายโดย: partner]`; }
 
     const { error } = await supabaseClient
@@ -235,7 +235,7 @@ async function saveTransaction(categoryName, type) {
     if (error) {
         showToast(`บันทึกไม่สำเร็จ: ${error.message}`, '❌', true);
     } else {
-        amountInput.value = ''; noteInput.value = ''; if(slipInput) slipInput.value = '';
+        amountInput.value = ''; noteInput.value = ''; if (slipInput) slipInput.value = '';
         ownerInput.value = currentUserRole === 'me' ? 'me' : 'partner';
         showToast('จดบันทึกเรียบร้อยแล้วจ้า! 💰', '✅');
         await loadTransactions();
@@ -245,12 +245,12 @@ async function saveTransaction(categoryName, type) {
 function enterEditMode(id, amount, note, originalOwner) {
     document.getElementById('editTxId').value = id;
     document.getElementById('txAmount').value = parseFloat(amount).toFixed(2);
-    
+
     let displayOwner = originalOwner;
     let displayNote = note || '';
-    
+
     if (originalOwner === 'shared') {
-        if (displayNote.startsWith('[จ่ายโดย: me]')) { displayOwner = 'shared-me'; displayNote = displayNote.replace('[จ่ายโดย: me] ', '').replace('[จ่ายโดย: me]', ''); } 
+        if (displayNote.startsWith('[จ่ายโดย: me]')) { displayOwner = 'shared-me'; displayNote = displayNote.replace('[จ่ายโดย: me] ', '').replace('[จ่ายโดย: me]', ''); }
         else if (displayNote.startsWith('[จ่ายโดย: partner]')) { displayOwner = 'shared-partner'; displayNote = displayNote.replace('[จ่ายโดย: partner] ', '').replace('[จ่ายโดย: partner]', ''); }
     }
 
@@ -262,7 +262,7 @@ function enterEditMode(id, amount, note, originalOwner) {
         if (match && match[1]) {
             const fileName = match[1];
             const { data } = supabaseClient.storage.from('slips').getPublicUrl(fileName);
-            
+
             const infoDiv = document.createElement('div');
             infoDiv.id = 'existingSlipArea';
             infoDiv.className = 'mt-2 mb-2 p-2 bg-white rounded border text-center';
@@ -276,7 +276,7 @@ function enterEditMode(id, amount, note, originalOwner) {
 
     document.getElementById('txNote').value = displayNote;
     document.getElementById('txOwner').value = displayOwner;
-    
+
     const recordBox = document.getElementById('recordBox');
     recordBox.style.backgroundColor = '#fff3cd'; recordBox.style.borderColor = '#ffc107';
     document.getElementById('recordBoxTitle').innerHTML = '<i class="bi bi-pencil-fill text-warning me-1"></i> แก้ไขและระบุหมวดหมู่จริง';
@@ -315,7 +315,7 @@ async function submitEditTransaction() {
     let dbOwner = owner;
     let finalNote = note;
 
-    if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: me] ${finalNote}` : `[จ่ายโดย: me]`; } 
+    if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: me] ${finalNote}` : `[จ่ายโดย: me]`; }
     else if (dbOwner === 'shared-partner') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: partner] ${finalNote}` : `[จ่ายโดย: partner]`; }
 
     // 💡 [ลอจิกที่แก้ไขให้ถูกต้อง] ดึงหมวดหมู่ตามชื่อปุ่มล่าสุดที่คุณเดฟเลือก ถ้าอยู่ในโหมดแก้ไขให้รักษาสิทธิ์ตามจริง
@@ -347,7 +347,7 @@ async function submitEditTransaction() {
 
 async function deleteTransaction(id) {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบประวัติรายการเงินแถวนี้ทิ้งอย่างถาวร?')) return;
-    
+
     const { data: currentTx } = await supabaseClient.from('transactions').select('note').eq('id', id).single();
     if (currentTx && currentTx.note && currentTx.note.includes('[SLIP_URL:')) {
         const match = currentTx.note.match(/\[SLIP_URL:(.*?)\]/);
@@ -388,8 +388,8 @@ async function loadGoals() {
     goals.forEach(goal => {
         const div = document.createElement('div'); div.className = "list-group-item d-flex justify-content-between align-items-center p-2 mb-1 bg-light rounded-3 border-0 text-sm shadow-2xs";
         let actionUI = '';
-        if (goal.is_completed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-success">✅ สำเร็จ</span><button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; } 
-        else if (goal.is_failed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-secondary text-dark">❌ ข้าม</span><button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; } 
+        if (goal.is_completed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-success">✅ สำเร็จ</span><button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
+        else if (goal.is_failed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-secondary text-dark">❌ ข้าม</span><button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
         else { actionUI = `<div class="btn-group btn-group-sm" style="border-radius:8px; overflow:hidden;"><button onclick="settleGoal(${goal.id}, 'success', '${goal.title}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-success py-0.5 px-2 cursor-pointer">✅ ออมแล้ว</button><button onclick="settleGoal(${goal.id}, 'failed', '${goal.title}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-danger py-0.5 px-2 cursor-pointer">❌ ข้าม</button><button onclick="deleteGoalFrontend(${goal.id})" class="btn btn-link text-muted p-0 px-1 ms-1 text-xs cursor-pointer" title="ลบถาวร">🗑️</button></div>`; }
         div.innerHTML = `<div class="text-truncate me-2"><span class="${goal.is_completed ? 'text-decoration-line-through text-muted' : goal.is_failed ? 'text-decoration-line-through text-black-50 font-normal' : 'fw-semibold text-dark'}">${goal.type === 'save' ? '🎯' : '📄'} ${goal.title}</span></div><div class="d-flex align-items-center gap-2 shrink-0"><span class="fw-bold text-dark">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>${actionUI}</div>`;
         goalsList.appendChild(div);
@@ -402,7 +402,7 @@ async function settleGoal(id, status, title, amount, type) {
         const { error } = await supabaseClient.from('goals').update({ is_completed: true, is_failed: false }).eq('id', id);
         if (error) return showToast(error.message, '❌', true);
         const finalAmount = parseFloat(parseFloat(amount).toFixed(2));
-        if (type === 'save') { await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]); showToast('ย้ายเงินเข้าบัญชีฉุกเฉินแล้ว 🎯', '🎉'); } 
+        if (type === 'save') { await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]); showToast('ย้ายเงินเข้าบัญชีฉุกเฉินแล้ว 🎯', '🎉'); }
         else { let noteWithTag = `[จ่ายโดย: ${currentUserRole === 'me' ? 'me' : 'partner'}] จ่ายบิลออโต้: ${title}`; await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: noteWithTag }]); showToast('ตัดยอดบิลส่วนกลางเรียบร้อย 📄', '✅'); }
     } else {
         if (!confirm(`เดือนนี้ล้มเหลว/ข้ามภารกิจ: "${title}" ใช่ไหม?`)) return;
@@ -436,7 +436,7 @@ async function loadTransactions() {
 
         let exactOwner = tx.owner; let cleanNote = tx.note || '';
         if (tx.owner === 'shared') {
-            if (cleanNote.startsWith('[จ่ายโดย: me]')) { exactOwner = 'shared-me'; cleanNote = cleanNote.replace('[จ่ายโดย: me] ', '').replace('[จ่ายโดย: me]', ''); } 
+            if (cleanNote.startsWith('[จ่ายโดย: me]')) { exactOwner = 'shared-me'; cleanNote = cleanNote.replace('[จ่ายโดย: me] ', '').replace('[จ่ายโดย: me]', ''); }
             else if (cleanNote.startsWith('[จ่ายโดย: partner]')) { exactOwner = 'shared-partner'; cleanNote = cleanNote.replace('[จ่ายโดย: partner] ', '').replace('[จ่ายโดย: partner]', ''); }
         }
 
@@ -446,8 +446,8 @@ async function loadTransactions() {
         else if (tx.owner === 'shared') sharedTotal += value;
 
         let isCurrentFilterMonth = false;
-        if (filterDate === 'this-month') { if (txDate.getMonth() !== thisMonth || txDate.getFullYear() !== thisYear) return; isCurrentFilterMonth = true; } 
-        else if (filterDate === 'last-month') { let targetMonth = thisMonth - 1; let targetYear = thisYear; if (targetMonth < 0) { targetMonth = 11; targetYear--; } if (txDate.getMonth() !== targetMonth || txDate.getFullYear() !== targetYear) return; isCurrentFilterMonth = true; } 
+        if (filterDate === 'this-month') { if (txDate.getMonth() !== thisMonth || txDate.getFullYear() !== thisYear) return; isCurrentFilterMonth = true; }
+        else if (filterDate === 'last-month') { let targetMonth = thisMonth - 1; let targetYear = thisYear; if (targetMonth < 0) { targetMonth = 11; targetYear--; } if (txDate.getMonth() !== targetMonth || txDate.getFullYear() !== targetYear) return; isCurrentFilterMonth = true; }
         else { isCurrentFilterMonth = true; }
 
         if (isCurrentFilterMonth && tx.type === 'expense') {
@@ -513,8 +513,8 @@ async function loadTransactions() {
         billTextEl.innerHTML = `<div class="text-center py-2">🎉 ยังไม่มีรายจ่ายกองกลางร่วมกันในเดือนนี้<br><span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะช่วยหารครึ่งทันทีเมื่อจดรายการผ่านกระเป๋า "กองกลาง")</span></div>`;
     } else {
         const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared; const halfShare = grandSharedExpense / 2; let settlementResultText = "";
-        if (totalMePaidShared > totalPartnerPaidShared) { const diff = totalMePaidShared - halfShare; settlementResultText = `🙋‍♀️ แฟนต้องโอนคืนให้คุณ: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; } 
-        else if (totalPartnerPaidShared > totalMePaidShared) { const diff = totalPartnerPaidShared - halfShare; settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; } 
+        if (totalMePaidShared > totalPartnerPaidShared) { const diff = totalMePaidShared - halfShare; settlementResultText = `🙋‍♀️ แฟนต้องโอนคืนให้คุณ: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
+        else if (totalPartnerPaidShared > totalMePaidShared) { const diff = totalPartnerPaidShared - halfShare; settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
         else { settlementResultText = `🤝 ยอดออกเงินคนละครึ่งเท่ากันเป๊ะ พอดิบพอดีจ้า!`; }
         billTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• คุณควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | แฟนควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
     }
