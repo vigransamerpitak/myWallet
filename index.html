@@ -230,7 +230,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card balance-card bg-emergency-wallet h-100">
                         <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
-                            <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">เงินออมสำรองฉุกเฉิน 🎯</p>
+                            <p id="labelWalletEmergency" class="small fw-bold opacity-75 mb-1 text-truncate w-100">เงินออมสำรองฉุกเฉิน 🎯</p>
                             <h4 id="emergencyTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
                         </div>
                     </div>
@@ -410,7 +410,7 @@
                             <option value="partner" id="optOwnerPartner">🙋‍♀️ กระเป๋าส่วนตัว (คุณเอิร์น)</option>
                             <option value="shared-me" id="optOwnerSharedMe">🤝 เงินกองกลาง (คุณโบ๊ท ออกก่อน)</option>
                             <option value="shared-partner" id="optOwnerSharedPartner">🤝 เงินกองกลาง (คุณเอิร์น ออกก่อน)</option>
-                            <option value="emergency">🚨 บัญชีออมสำรองฉุกเฉิน</option>
+                            <option value="emergency" id="optOwnerEmergency">🚨 บัญชีออมสำรองฉุกเฉิน</option>
                         </select>
                     </div>
                 </div>
@@ -477,7 +477,7 @@
                             <option value="me">🙋‍♂️ เฉพาะของคุณโบ๊ท</option>
                             <option value="partner">🙋‍♀️ เฉพาะของคุณเอิร์น</option>
                             <option value="shared">🤝 เฉพาะส่วนกลางทั้งหมด</option>
-                            <option value="emergency">🎯 เฉพาะเงินออมฉุกเฉิน</option>
+                            <option value="emergency" id="filterEmergency">🎯 เฉพาะเงินออมฉุกเฉิน</option>
                         </select>
                     </div>
                     <div class="col-12 col-md-4">

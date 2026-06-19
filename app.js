@@ -34,16 +34,43 @@ function updateEmergencyTarget(val) {
 function initEmergencyTargetTitle() {
     const input = document.getElementById('emergencyTargetTitleInput');
     if (!input) return;
-    const saved = localStorage.getItem('emergencyTargetTitle') || 'ความคืบหน้าเงินออมฉุกเฉิน';
+    const saved = localStorage.getItem('emergencyTargetTitle') || 'เงินออมสำรองฉุกเฉิน';
     input.value = saved;
+    syncEmergencyLabels();
 }
 
 function updateEmergencyTargetTitle(val) {
     let clean = val.trim();
-    if (!clean) clean = "ความคืบหน้าเงินออมฉุกเฉิน";
+    if (!clean) clean = "เงินออมสำรองฉุกเฉิน";
     localStorage.setItem('emergencyTargetTitle', clean);
     const input = document.getElementById('emergencyTargetTitleInput');
     if (input) input.value = clean;
+    syncEmergencyLabels();
+    
+    // รีโหลดหน้าจอเพื่อให้ badges ในประวัติเปลี่ยนชื่อเป้าหมายทันที
+    loadTransactions();
+}
+
+function syncEmergencyLabels() {
+    const saved = localStorage.getItem('emergencyTargetTitle') || 'เงินออมสำรองฉุกเฉิน';
+    
+    // 1. อัปเดตหัวข้อการ์ดกระเป๋าเงินฉุกเฉินบน Dashboard
+    const labelWalletEmergency = document.getElementById('labelWalletEmergency');
+    if (labelWalletEmergency) {
+        labelWalletEmergency.innerText = `${saved} 🎯`;
+    }
+    
+    // 2. อัปเดตตัวเลือกในกล่องจดบันทึก
+    const optOwnerEmergency = document.getElementById('optOwnerEmergency');
+    if (optOwnerEmergency) {
+        optOwnerEmergency.innerText = `🚨 บัญชีออม (${saved})`;
+    }
+    
+    // 3. อัปเดตตัวเลือกกรองในประวัติการทำรายการ
+    const filterEmergency = document.getElementById('filterEmergency');
+    if (filterEmergency) {
+        filterEmergency.innerText = `🎯 เฉพาะ${saved}`;
+    }
 }
 
 function getGoalIcon(type) {
@@ -1280,12 +1307,13 @@ async function loadTransactions() {
 
     const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
     const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+    const emergencyTitle = localStorage.getItem('emergencyTargetTitle') || 'เงินออมสำรองฉุกเฉิน';
 
     pageItems.forEach(({ tx, txDate, txAmount, exactOwner, cleanNote }) => {
         let ownerBadge = '';
         if (exactOwner === 'me') ownerBadge = `<span class="badge bg-primary-subtle text-primary">🙋‍♂️ ${nameMe}</span>`;
         else if (exactOwner === 'partner') ownerBadge = `<span class="badge bg-danger-subtle text-danger">🙋‍♀️ ${namePartner}</span>`;
-        else if (exactOwner === 'emergency') ownerBadge = '<span class="badge bg-success text-white">🎯 ออมฉุกเฉิน</span>';
+        else if (exactOwner === 'emergency') ownerBadge = `<span class="badge bg-success text-white">🎯 ${emergencyTitle}</span>`;
         else if (exactOwner === 'shared-me') ownerBadge = `<span class="badge bg-warning text-dark">🤝 กองกลาง (${nameMe}จ่าย)</span>`;
         else if (exactOwner === 'shared-partner') ownerBadge = `<span class="badge bg-warning text-dark">🤝 กองกลาง (${namePartner}จ่าย)</span>`;
         else ownerBadge = '<span class="badge bg-warning text-dark">🤝 กองกลาง</span>';
@@ -1397,13 +1425,14 @@ function exportCSV() {
     const rows = filteredTxsCache.map(({ tx, txDate, txAmount, exactOwner }) => {
         const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
         const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+        const emergencyTitle = localStorage.getItem('emergencyTargetTitle') || 'เงินออมสำรองฉุกเฉิน';
         const ownerMap = { 
             'me': nameMe, 
             'partner': namePartner, 
             'shared': 'กองกลาง', 
             'shared-me': `กองกลาง (${nameMe}จ่าย)`, 
             'shared-partner': `กองกลาง (${namePartner}จ่าย)`, 
-            'emergency': 'ออมฉุกเฉิน' 
+            'emergency': emergencyTitle 
         };
         const dateStr = txDate.toLocaleString('th-TH', { hour12: false });
         let note = (tx.note || '').replace(/\[SLIP_URL:.*?\]/g, '').replace(/\[จ่ายโดย:.*?\]/g, '').trim();
