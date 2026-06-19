@@ -152,6 +152,52 @@
             background-color: var(--light-bg) !important;
             box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
         }
+
+        /* 🏆 Milestone Badges & Cards */
+        .milestone-badge {
+            width: 105px;
+            min-height: 120px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--light-bg);
+            border: 2px solid var(--card-border);
+            position: relative;
+            cursor: pointer;
+            border-radius: 16px !important;
+        }
+        .milestone-badge.locked {
+            filter: grayscale(1) opacity(0.5);
+        }
+        .milestone-badge:hover {
+            transform: translateY(-4px);
+        }
+        .milestone-badge.unlocked {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border-color: #f59e0b !important;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);
+        }
+        [data-theme="dark"] .milestone-badge.unlocked {
+            background: linear-gradient(135deg, #451a03, #1e0b00) !important;
+            border-color: #fbbf24 !important;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.2);
+        }
+        .milestone-badge.unlocked .milestone-title {
+            color: #78350f !important;
+        }
+        [data-theme="dark"] .milestone-badge.unlocked .milestone-title {
+            color: #fbbf24 !important;
+        }
+        @keyframes bounce-small {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .animated-bounce {
+            animation: bounce-small 2s infinite ease-in-out;
+        }
+        .btn-xs {
+            padding: 2px 6px !important;
+            font-size: 0.7rem !important;
+            border-radius: 6px !important;
+        }
     </style>
 </head>
 <body class="py-4">
@@ -332,6 +378,66 @@
                 </div>
                 <div class="d-flex justify-content-end mt-3">
                     <button onclick="createNewGoalFrontend()" class="btn btn-indigo px-4 py-2 shadow-xs">➕ เพิ่มภารกิจลงหน้าจอ</button>
+                </div>
+            </div>
+
+            <!-- 📅 บิลรายเดือน & 🏆 ถ้วยรางวัลออมเงิน -->
+            <div class="row g-4 mt-1">
+                <!-- 📅 บิลรายเดือน & บริการรายรอบประจำ -->
+                <div class="col-12 col-md-6">
+                    <div class="card bg-white border-0 shadow-xs p-3" style="border-radius: 24px; border: 1px solid var(--card-border)!important; min-height: 245px; background-color: var(--card-bg) !important; color: var(--color-text);">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold text-dark mb-0 d-flex align-items-center"><i class="bi bi-calendar-event-fill text-danger me-2"></i> บิลและค่าบริการรายเดือนประจำ</h6>
+                            <button onclick="toggleBillForm(true)" class="btn btn-outline-danger btn-xs py-0.5 px-2 rounded-3 text-xs" style="font-size: 0.75rem;">➕ ตั้งค่าบิล</button>
+                        </div>
+                        
+                        <!-- ฟอร์มเพิ่มบิลใหม่แบบ Inline (ซ่อน/แสดง) -->
+                        <div id="addBillForm" class="d-none p-3 bg-light rounded-4 border mb-2 text-xs" style="background-color: var(--light-bg) !important; border-color: var(--card-border) !important;">
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary mb-0.5">ชื่อบริการ (เช่น Netflix 📺)</label>
+                                    <input type="text" id="billTitleInput" class="form-control form-control-sm" style="font-size: 0.75rem;" placeholder="Netflix">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary mb-0.5">ยอดเงิน (บาท)</label>
+                                    <input type="number" id="billAmountInput" class="form-control form-control-sm" style="font-size: 0.75rem;" placeholder="0">
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary mb-0.5">ดิววันที่ (1-31)</label>
+                                    <input type="number" id="billDueInput" class="form-control form-control-sm" style="font-size: 0.75rem;" placeholder="15" min="1" max="31">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary mb-0.5">ผู้จ่าย (แชร์กองกลาง)</label>
+                                    <select id="billShareInput" class="form-select form-select-sm" style="font-size: 0.75rem;">
+                                        <option value="shared-me">🤝 กองกลาง (Boat จ่ายก่อน)</option>
+                                        <option value="shared-partner">🤝 กองกลาง (Earn จ่ายก่อน)</option>
+                                        <option value="me">🙋‍♂️ Boat จ่ายคนเดียว</option>
+                                        <option value="partner">🙋‍♀️ Earn จ่ายคนเดียว</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-1">
+                                <button onclick="toggleBillForm(false)" class="btn btn-outline-secondary btn-xs py-1">ยกเลิก</button>
+                                <button onclick="saveNewBill()" class="btn btn-danger btn-xs py-1 px-3">บันทึก</button>
+                            </div>
+                        </div>
+
+                        <div id="recurringBillsList" class="overflow-y-auto pe-1" style="max-height: 185px;">
+                            <!-- โหลดรายการบิลประจำไดนามิกผ่าน JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🏆 ถ้วยรางวัลและความท้าทายออมเงิน -->
+                <div class="col-12 col-md-6">
+                    <div class="card bg-white border-0 shadow-xs p-3" style="border-radius: 24px; border: 1px solid var(--card-border)!important; min-height: 245px; background-color: var(--card-bg) !important; color: var(--color-text);">
+                        <h6 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-award-fill text-warning me-2"></i> หอเกียรติยศถ้วยรางวัลการออม (Milestones)</h6>
+                        <div id="coupleMilestonesArea" class="d-flex flex-wrap gap-2 justify-content-around align-items-center py-1" style="max-height: 185px; overflow-y: auto;">
+                            <!-- โหลดเหรียญตราและความคืบหน้าไดนามิกผ่าน JS -->
+                        </div>
+                    </div>
                 </div>
             </div>
 

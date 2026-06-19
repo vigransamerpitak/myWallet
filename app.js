@@ -15,6 +15,7 @@ let filteredTxsCache = []; // เก็บข้อมูลหลัง filter 
 
 let loadedTxsCache = []; // เก็บประวัติรายการดิบทั้งหมด
 let loadedGoalsCache = []; // เก็บรายการเควสเป้าหมายดิบทั้งหมด
+let recurringBills = []; // เก็บข้อมูลบิลประจำรายเดือน
 let currentTotalMePaidShared = 0; // ยอดรวมที่คุณโบ๊ทสำรองจ่ายไป
 let currentTotalPartnerPaidShared = 0; // ยอดรวมที่คุณเอิร์นสำรองจ่ายไป
 
@@ -365,6 +366,9 @@ window.onload = function () {
 
             // โหลดตั้งค่าชื่อผู้ใช้งานแบบไดนามิก
             initDynamicNames();
+
+            // โหลดรายการบิลประจำรายเดือน
+            initRecurringBills();
 
             // โหลดหมวดหมู่ และ โหลดตารางรายการเงินไปพร้อมๆ กัน ไม่ต้องรอคิว
             await Promise.all([loadCategories(), updateFilters()]);
@@ -1581,6 +1585,7 @@ async function loadTransactions() {
     // ✨ [ข้อ 8] สร้างกราฟแนวโน้มรายเดือนจากข้อมูลทั้งหมด
     renderMonthlyTrend(txs);
     renderSavingsTrend(txs);
+    updateMilestones(txs);
 
     loadedTxsCache = txs || [];
     currentTotalMePaidShared = totalMePaidShared;
@@ -1936,6 +1941,10 @@ function applyDynamicNames() {
             userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">${namePartner}</span>`;
         }
     }
+
+    // อัปเดตบิลรายเดือนกับเป้าหมายเหรียญรางวัลให้ใช้ชื่อใหม่ทันที
+    if (typeof renderRecurringBills === 'function') renderRecurringBills();
+    if (typeof updateMilestones === 'function') updateMilestones(loadedTxsCache);
 }
 
 function toggleSettingsPanel() {
@@ -1949,4 +1958,302 @@ function toggleSettingsPanel() {
         body.classList.add('d-none');
         icon.innerHTML = 'คลิกเพื่อเปิดดู <i class="bi bi-chevron-down"></i>';
     }
+}
+
+// =========================================================================
+// 📅 บิลประจำรายเดือน & ค่าบริการรายรอบ (Recurring Bills & Subscriptions)
+// =========================================================================
+
+function initRecurringBills() {
+    const saved = localStorage.getItem('recurringBills');
+    if (!saved) {
+        // ค่าตั้งต้นที่มักใช้ร่วมกันของคู่รัก
+        const defaultBills = [
+            { title: "Netflix 📺", amount: 419, dueDay: 15, share: "shared-me", history: {} },
+            { title: "Spotify Family 🎵", amount: 209, dueDay: 20, share: "shared-partner", history: {} },
+            { title: "ค่าไฟห้องคอนโด ⚡", amount: 1500, dueDay: 5, share: "shared-me", history: {} }
+        ];
+        localStorage.setItem('recurringBills', JSON.stringify(defaultBills));
+        recurringBills = defaultBills;
+    } else {
+        try {
+            recurringBills = JSON.parse(saved);
+        } catch (e) {
+            recurringBills = [];
+        }
+    }
+    renderRecurringBills();
+}
+
+function toggleBillForm(show) {
+    const form = document.getElementById('addBillForm');
+    if (form) {
+        if (show) {
+            form.classList.remove('d-none');
+        } else {
+            form.classList.add('d-none');
+            // ล้างฟิลด์ในฟอร์ม
+            document.getElementById('billTitleInput').value = '';
+            document.getElementById('billAmountInput').value = '';
+            document.getElementById('billDueInput').value = '15';
+            document.getElementById('billShareInput').value = 'shared-me';
+        }
+    }
+}
+
+function saveNewBill() {
+    const title = document.getElementById('billTitleInput').value.trim();
+    const amount = parseFloat(document.getElementById('billAmountInput').value);
+    const dueDay = parseInt(document.getElementById('billDueInput').value);
+    const share = document.getElementById('billShareInput').value;
+
+    if (!title) return showToast('กรุณากรอกชื่อบริการด้วยครับ', '⚠️', true);
+    if (isNaN(amount) || amount <= 0) return showToast('กรุณากรอกยอดเงินให้ถูกต้อง', '🔢', true);
+    if (isNaN(dueDay) || dueDay < 1 || dueDay > 31) return showToast('กรุณากรอกดิววันที่ระหว่าง 1 - 31', '📅', true);
+
+    const newBill = {
+        title: title,
+        amount: parseFloat(amount.toFixed(2)),
+        dueDay: dueDay,
+        share: share,
+        history: {}
+    };
+
+    recurringBills.push(newBill);
+    localStorage.setItem('recurringBills', JSON.stringify(recurringBills));
+    toggleBillForm(false);
+    renderRecurringBills();
+    showToast('เพิ่มรายการบิลประจำเรียบร้อยแล้วจ้า! 📅', '✅');
+}
+
+function deleteBill(index) {
+    if (!confirm(`ต้องการลบรายการบิล "${recurringBills[index].title}" ใช่หรือไม่?`)) return;
+    recurringBills.splice(index, 1);
+    localStorage.setItem('recurringBills', JSON.stringify(recurringBills));
+    renderRecurringBills();
+    showToast('ลบรายการบิลเรียบร้อยแล้ว', '🗑️');
+}
+
+function getCategoryForBill(title) {
+    const lower = title.toLowerCase();
+    if (lower.includes('ไฟ') || lower.includes('น้ำ') || lower.includes('เน็ต') || lower.includes('บ้าน') || lower.includes('คอนโด') || lower.includes('📺') || lower.includes('netflix') || lower.includes('disney')) {
+        return 'ค่าที่พัก/บ้าน';
+    }
+    if (lower.includes('รถ') || lower.includes('น้ำมัน') || lower.includes('เดินทาง') || lower.includes('⛽')) {
+        return 'เดินทาง';
+    }
+    return 'อื่นๆ';
+}
+
+async function payBill(index) {
+    const bill = recurringBills[index];
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+    
+    if (!confirm(`ยืนยันจ่ายบิลประจำเดือนสำหรับ: "${bill.title}" ยอดเงิน ${bill.amount.toLocaleString()} บาท?\n(ระบบจะสร้างธุรกรรมรายจ่ายให้อัตโนมัติ)`)) return;
+
+    // คำนวณรหัสรอบเดือนปัจจุบัน (เช่น 06-2026)
+    const now = new Date();
+    const monthYearKey = `${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getFullYear()}`;
+
+    // 1. เพิ่มข้อมูลธุรกรรมในฐานข้อมูล
+    let dbOwner = bill.share;
+    let finalNote = `[จ่ายบิลประจำ] ${bill.title}`;
+    
+    if (dbOwner === 'shared-me') {
+        dbOwner = 'shared';
+        finalNote = `[จ่ายโดย: me] ${finalNote}`;
+    } else if (dbOwner === 'shared-partner') {
+        dbOwner = 'shared';
+        finalNote = `[จ่ายโดย: partner] ${finalNote}`;
+    }
+
+    const { error } = await supabaseClient.from('transactions').insert([{
+        amount: bill.amount,
+        type: 'expense',
+        category_name: getCategoryForBill(bill.title),
+        note: finalNote,
+        owner: dbOwner,
+        created_at: now.toISOString()
+    }]);
+
+    if (error) {
+        return showToast(`บันทึกจ่ายบิลล้มเหลว: ${error.message}`, '❌', true);
+    }
+
+    // 2. อัปเดตประวัติการจ่ายลงใน LocalStorage
+    bill.history[monthYearKey] = true;
+    localStorage.setItem('recurringBills', JSON.stringify(recurringBills));
+
+    showToast(`จ่ายบิล ${bill.title} และลงบันทึกรายจ่ายเรียบร้อย! 🎉`, '💳');
+    triggerCelebration();
+    renderRecurringBills();
+    await loadTransactions();
+}
+
+function renderRecurringBills() {
+    const list = document.getElementById('recurringBillsList');
+    if (!list) return;
+
+    if (recurringBills.length === 0) {
+        list.innerHTML = `<p class="text-center text-muted py-4 small mb-0">💡 ยังไม่มีรายการบิลประจำ คลิกปุ่ม "ตั้งค่าบิล" ด้านบนเพื่อเพิ่มได้เลยครับ</p>`;
+        return;
+    }
+
+    const now = new Date();
+    const monthYearKey = `${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getFullYear()}`;
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+
+    list.innerHTML = '';
+    recurringBills.forEach((bill, idx) => {
+        const isPaidThisMonth = bill.history[monthYearKey] === true;
+        
+        let shareText = '';
+        if (bill.share === 'shared-me') shareText = `🤝 กองกลาง (${nameMe} จ่ายก่อน)`;
+        else if (bill.share === 'shared-partner') shareText = `🤝 กองกลาง (${namePartner} จ่ายก่อน)`;
+        else if (bill.share === 'me') shareText = `🙋‍♂️ กระเป๋า ${nameMe} จ่ายเดี่ยว`;
+        else if (bill.share === 'partner') shareText = `🙋‍♀️ กระเป๋า ${namePartner} จ่ายเดี่ยว`;
+
+        const row = document.createElement('div');
+        row.className = "d-flex align-items-center justify-content-between p-2 mb-2 bg-light rounded-3 text-xs";
+        row.style.backgroundColor = "var(--light-bg)";
+        row.style.border = "1px solid var(--card-border)";
+        
+        let actionHTML = '';
+        if (isPaidThisMonth) {
+            actionHTML = `<span class="badge bg-success-subtle text-success py-1 px-2.5 rounded-pill fw-bold"><i class="bi bi-check-circle-fill me-1"></i> จ่ายแล้ว</span>`;
+        } else {
+            actionHTML = `<button onclick="payBill(${idx})" class="btn btn-success btn-xs py-1 px-2.5 fw-bold cursor-pointer rounded-pill shadow-xs">💳 จ่ายแล้ว</button>`;
+        }
+
+        row.innerHTML = `
+            <div class="text-truncate me-2" style="max-width: 65%;">
+                <span class="fw-bold text-dark d-flex align-items-center" style="font-size: 0.8rem; color: var(--text-dark) !important;">
+                    ${bill.title}
+                    <span onclick="deleteBill(${idx})" class="text-muted ms-2 cursor-pointer small" style="opacity:0.5; font-size: 0.7rem;" title="ลบบิลประจำนี้">🗑️</span>
+                </span>
+                <span class="text-muted small d-block mt-0.5" style="font-size: 0.65rem;">ดิววันที่ ${bill.dueDay} • ${shareText}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 shrink-0">
+                <span class="fw-bold text-dark" style="font-size: 0.8rem; color: var(--text-dark) !important;">${parseFloat(bill.amount).toLocaleString('th-TH')} บ.</span>
+                ${actionHTML}
+            </div>
+        `;
+        list.appendChild(row);
+    });
+}
+
+// =========================================================================
+// 🏆 ถ้วยรางวัลการออมคู่รัก (Milestones & Achievements)
+// =========================================================================
+
+function updateMilestones(allTxs) {
+    const area = document.getElementById('coupleMilestonesArea');
+    if (!area) return;
+    if (!allTxs) allTxs = [];
+
+    // 1. คำนวณยอดเงินสะสมในคลังออมฉุกเฉิน
+    let emergencyBalance = 0;
+    allTxs.forEach(tx => {
+        if (tx.owner === 'emergency') {
+            const amt = parseFloat(tx.amount);
+            emergencyBalance += (tx.type === 'income' ? amt : -amt);
+        }
+    });
+
+    // 2. คำนวณยอดรายจ่ายแชร์ส่วนกลางประจำเดือนนี้
+    const now = new Date();
+    let sharedExpenseThisMonth = 0;
+    allTxs.forEach(tx => {
+        const txDate = new Date(tx.created_at);
+        if (tx.owner === 'shared' && tx.type === 'expense' && txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear()) {
+            sharedExpenseThisMonth += parseFloat(tx.amount);
+        }
+    });
+
+    const emergencyTarget = parseFloat(localStorage.getItem('emergencyTarget')) || 50000;
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+
+    // 3. กำหนดข้อมูล Milestone แต่ละขั้น
+    const milestones = [
+        {
+            id: "sprout",
+            icon: "🥉",
+            title: "ต้นรักแรกออม",
+            desc: "ออมเงินคลังแตะ 5,000 บ.",
+            target: 5000,
+            current: emergencyBalance,
+            isUnlocked: emergencyBalance >= 5000,
+            displayProgress: `สะสมแล้ว: ${Math.min(5000, Math.max(0, emergencyBalance)).toLocaleString()} บ.`
+        },
+        {
+            id: "shield",
+            icon: "🥈",
+            title: "ผู้พิทักษ์กระเป๋า",
+            desc: "ออมเงินคลังแตะ 20,000 บ.",
+            target: 20000,
+            current: emergencyBalance,
+            isUnlocked: emergencyBalance >= 20000,
+            displayProgress: `สะสมแล้ว: ${Math.min(20000, Math.max(0, emergencyBalance)).toLocaleString()} บ.`
+        },
+        {
+            id: "palace",
+            icon: "🥇",
+            title: "เศรษฐีสร้างตัว",
+            desc: `ออมเงินคลังครบเป้าหมายหลัก`,
+            target: emergencyTarget,
+            current: emergencyBalance,
+            isUnlocked: emergencyBalance >= emergencyTarget,
+            displayProgress: `สะสมแล้ว: ${Math.min(emergencyTarget, Math.max(0, emergencyBalance)).toLocaleString()} บ.`
+        },
+        {
+            id: "frugal",
+            icon: "💎",
+            title: `${nameMe} & ${namePartner} ประหยัดเก่ง`,
+            desc: `รายจ่ายกองกลางต่ำกว่า 10,000 บ.`,
+            target: 10000,
+            current: sharedExpenseThisMonth,
+            isUnlocked: sharedExpenseThisMonth > 0 && sharedExpenseThisMonth < 10000,
+            displayProgress: sharedExpenseThisMonth === 0 ? "ยังไม่มีรายจ่ายกองกลาง" : `รายจ่ายเดือนนี้: ${sharedExpenseThisMonth.toLocaleString()} บ.`
+        }
+    ];
+
+    // 4. เรนเดอร์การ์ด Milestone
+    area.innerHTML = '';
+    milestones.forEach(m => {
+        const card = document.createElement('div');
+        
+        if (m.isUnlocked) {
+            card.className = "milestone-badge text-center p-2 rounded-4 shadow-xs unlocked animated-bounce";
+            card.style.background = "linear-gradient(135deg, #fffbeb, #fef3c7)";
+            card.style.borderColor = "#f59e0b";
+            card.title = `${m.title}: ${m.desc} (ปลดล็อคสำเร็จแล้ว! 🎉)`;
+            
+            card.innerHTML = `
+                <div class="milestone-icon fs-2">${m.icon}</div>
+                <div class="fw-bold mt-1 milestone-title" style="font-size: 0.7rem; line-height: 1.1; color: #78350f;">${m.title}</div>
+                <span class="small d-block text-muted mt-0.5" style="font-size: 0.55rem; color: #b45309 !important;">${m.displayProgress}</span>
+                <span class="badge bg-success text-white rounded-pill mt-1" style="font-size: 0.55rem; padding: 1px 6px;">🔓 สำเร็จ</span>
+            `;
+        } else {
+            card.className = "milestone-badge text-center p-2 rounded-4 locked";
+            card.title = `${m.title}: ${m.desc} (ยังทำไม่สำเร็จ 🔒)`;
+            
+            let statusText = '🔒 ล็อค';
+            if (m.id === 'frugal' && sharedExpenseThisMonth >= 10000) {
+                statusText = '❌ เกินงบ';
+            }
+
+            card.innerHTML = `
+                <div class="milestone-icon fs-2" style="opacity: 0.5;">${m.icon}</div>
+                <div class="fw-bold mt-1 text-muted" style="font-size: 0.7rem; line-height: 1.1;">${m.title}</div>
+                <span class="small d-block text-muted mt-0.5" style="font-size: 0.55rem; opacity: 0.75;">${m.displayProgress}</span>
+                <span class="badge bg-secondary text-dark rounded-pill mt-1" style="font-size: 0.55rem; padding: 1px 6px;">${statusText}</span>
+            `;
+        }
+        
+        area.appendChild(card);
+    });
 }
