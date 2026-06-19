@@ -602,6 +602,63 @@
             0% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+
+        /* Specific jar colors & glows */
+        .dream-jar-liquid.save_travel {
+            background: linear-gradient(180deg, #4ea8de, #5390d9);
+        }
+        .dream-jar-liquid.save_travel::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #4ea8de;
+        }
+        
+        .dream-jar-liquid.save_shopping {
+            background: linear-gradient(180deg, #ff7096, #ff0a54);
+        }
+        .dream-jar-liquid.save_shopping::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #ff7096;
+        }
+        
+        .dream-jar-liquid.save_gift {
+            background: linear-gradient(180deg, #52b788, #2d6a4f);
+        }
+        .dream-jar-liquid.save_gift::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #52b788;
+        }
+        
+        .dream-jar-liquid.save_investment {
+            background: linear-gradient(180deg, #a2d2ff, #7209b7);
+        }
+        .dream-jar-liquid.save_investment::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #a2d2ff;
+        }
+        
+        .dream-jar-liquid.save_home {
+            background: linear-gradient(180deg, #fbc4ab, #f08080);
+        }
+        .dream-jar-liquid.save_home::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #fbc4ab;
+        }
+        
+        .dream-jar-liquid.save_car {
+            background: linear-gradient(180deg, #f26419, #f6bd60);
+        }
+        .dream-jar-liquid.save_car::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #f26419;
+        }
+        
+        .dream-jar-liquid.save_education {
+            background: linear-gradient(180deg, #48cae4, #0077b6);
+        }
+        .dream-jar-liquid.save_education::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #48cae4;
+        }
+        
+        .dream-jar-liquid.save_health {
+            background: linear-gradient(180deg, #a7c957, #386641);
+        }
+        .dream-jar-liquid.save_health::before {
+            box-shadow: 0 0 8px #fff, 0 0 15px #a7c957;
+        }
         
         /* Sparkles / Heart bubbles floating inside Jar */
         .sparkle-particle {
@@ -847,61 +904,15 @@
             <!-- หลอดความคืบหน้าเงินออมสำรองฉุกเฉิน & คำแนะนำการเงินอัจฉริยะ -->
             <div class="row g-4 mb-4">
                 <div class="col-12 col-md-6">
-                    <div class="premium-card mb-0 h-100">
-                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap pb-2 border-bottom border-light border-opacity-25"
-                            style="gap: 16px; row-gap: 16px;">
+                    <div class="premium-card mb-0 h-100" style="display: flex; flex-direction: column;">
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-light border-opacity-25" style="gap: 16px;">
                             <div class="d-flex align-items-center gap-1.5 flex-fill">
                                 <span class="text-success"><i class="bi bi-shield-fill-check fs-5"></i></span>
-                                <input type="text" id="emergencyTargetTitleInput"
-                                    onchange="updateEmergencyTargetTitle(this.value)"
-                                    class="form-control form-control-sm fw-bold text-dark border-0 bg-transparent p-0"
-                                    style="font-size: 0.95rem; width: auto; max-width: 185px; box-shadow: none !important;"
-                                    value="ความคืบหน้าเงินออมฉุกเฉิน" placeholder="พิมพ์ชื่อเป้าหมายการออม...">
-                                <i class="bi bi-pencil-fill text-muted ms-1 cursor-pointer" style="font-size: 0.75rem;"
-                                    onclick="document.getElementById('emergencyTargetTitleInput').focus()"
-                                    title="คลิกเพื่อแก้ไขชื่อเป้าหมาย"></i>
-                            </div>
-                            <div class="d-flex align-items-center gap-1">
-                                <span class="small text-muted" style="font-size: 0.75rem;">เป้าหมาย:</span>
-                                <input type="number" id="emergencyTargetInput"
-                                    onchange="updateEmergencyTarget(this.value)"
-                                    class="form-control form-control-xs py-0.5 px-2 fw-bold text-dark border-secondary"
-                                    style="width: 85px; font-size: 0.75rem; border-radius: 8px !important; padding: 0.2rem 0.4rem !important;"
-                                    value="50000">
-                                <span class="small text-muted" style="font-size: 0.75rem;">บ.</span>
+                                <h6 class="fw-bold text-dark mb-0">โหลแก้วออมเงินตามเป้าหมาย (Virtual Jars)</h6>
                             </div>
                         </div>
-                        <div class="row align-items-center g-2 mt-2">
-                            <!-- Left: Honey Jar -->
-                            <div class="col-4 text-center">
-                                <div class="dream-jar-container">
-                                    <div class="dream-jar-lid"></div>
-                                    <div class="dream-jar-neck"></div>
-                                    <div class="dream-jar">
-                                        <div id="dreamJarLiquid" class="dream-jar-liquid"></div>
-                                        <!-- Bubbles generated here -->
-                                        <div class="sparkle-particle" style="left:20px; animation-delay: 0.2s; width:6px; height:6px;"></div>
-                                        <div class="sparkle-particle" style="left:50px; animation-delay: 0.8s; width:8px; height:8px;"></div>
-                                        <div class="sparkle-particle" style="left:80px; animation-delay: 1.4s; width:5px; height:5px;"></div>
-                                        <div class="sparkle-particle" style="left:110px; animation-delay: 2s; width:7px; height:7px;"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Right: Progress Info -->
-                            <div class="col-8">
-                                <div class="progress animate-pulse" style="height: 16px; border-radius: 8px;">
-                                    <div id="emergencyProgressBar"
-                                        class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                                        role="progressbar"
-                                        style="width: 0%; border-radius: 8px; font-size: 0.7rem; font-weight: bold; line-height: 16px;">
-                                        0%</div>
-                                </div>
-                                <div class="mt-3 small">
-                                    <div class="mb-1 text-secondary fw-semibold">สะสมแล้ว:</div>
-                                    <h5 id="emergencyProgressCurrentText" class="text-success fw-extrabold mb-1">0.00 บาท</h5>
-                                    <div id="emergencyProgressRemainingText" class="text-muted" style="font-size: 0.72rem;">ยังขาดอีก: 50,000.00 บาท</div>
-                                </div>
-                            </div>
+                        <div id="savingsJarsContainer" class="overflow-y-auto flex-fill pe-1" style="max-height: 380px;">
+                            <!-- Jars will be dynamically rendered here -->
                         </div>
                     </div>
                 </div>

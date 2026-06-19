@@ -95,42 +95,193 @@ function getGoalIcon(type) {
 }
 
 function calculateEmergencyProgress() {
+    const container = document.getElementById('savingsJarsContainer');
+    if (!container) return;
+    
+    // 1. ดึงยอดรวมคลังออมฉุกเฉินทั้งหมดจาก DB
     const totalEl = document.getElementById('emergencyTotal');
-    if (!totalEl) return;
-    const currentVal = parseFloat(totalEl.innerText.replace(/[^0-9.-]+/g,"")) || 0;
-    const targetVal = parseFloat(localStorage.getItem('emergencyTarget')) || 50000;
+    const totalEmergencyBalance = totalEl ? (parseFloat(totalEl.innerText.replace(/[^0-9.-]+/g,"")) || 0) : 0;
     
+    // 2. ดึงเป้าหมายเงินออมฉุกเฉินหลัก
+    const mainTargetVal = parseFloat(localStorage.getItem('emergencyTarget')) || 50000;
+    const mainTargetTitle = localStorage.getItem('emergencyTargetTitle') || 'เงินออมสำรองฉุกเฉิน';
+    
+    // ซิงก์ค่าช่อง Input เผื่อมี
     const targetInput = document.getElementById('emergencyTargetInput');
-    if (targetInput) targetInput.value = targetVal;
+    if (targetInput) targetInput.value = mainTargetVal;
+    const titleInput = document.getElementById('emergencyTargetTitleInput');
+    if (titleInput) titleInput.value = mainTargetTitle;
 
-    const pct = Math.min(100, Math.max(0, (currentVal / targetVal) * 100)).toFixed(1);
-    
-    const progressBar = document.getElementById('emergencyProgressBar');
-    if (progressBar) {
-        progressBar.style.width = `${pct}%`;
-        progressBar.innerText = `${pct}%`;
-    }
-    
-    // Update Dream Savings Jar honey liquid level!
-    const dreamJarLiquid = document.getElementById('dreamJarLiquid');
-    if (dreamJarLiquid) {
-        dreamJarLiquid.style.height = `${pct}%`;
-    }
-    
-    const currentText = document.getElementById('emergencyProgressCurrentText');
-    if (currentText) {
-        currentText.innerText = `${currentVal.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`;
-    }
-    
-    const remainingText = document.getElementById('emergencyProgressRemainingText');
-    if (remainingText) {
-        const diff = targetVal - currentVal;
-        if (diff <= 0) {
-            remainingText.innerHTML = `<span class="text-success fw-bold">🎉 บรรลุเป้าหมายการออมสำเร็จ!</span>`;
-        } else {
-            remainingText.innerText = `ยังขาดอีก: ${diff.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`;
+    // 3. กรองหาเป้าหมายภารกิจออมเงิน (ประเภท save_*) จากเควสทั้งหมด
+    const saveGoals = (loadedGoalsCache || []).filter(g => {
+        let isSave = false;
+        let goalType = g.type;
+        const typeMatch = g.title.match(/^\[(save_[a-zA-Z0-9_]+)\]\s*/);
+        if (typeMatch || goalType === 'save') {
+            isSave = true;
         }
-    }
+        return isSave;
+    });
+
+    let earmarkedAmount = 0;
+    const jarItems = [];
+
+    // 4. คำนวณยอดสะสมของภารกิจแต่ละอัน
+    saveGoals.forEach(goal => {
+        let goalType = goal.type;
+        let goalTitle = goal.title;
+        const typeMatch = goalTitle.match(/^\[(save_[a-zA-Z0-9_]+)\]\s*/);
+        if (typeMatch) {
+            goalType = typeMatch[1];
+            goalTitle = goalTitle.replace(typeMatch[0], '');
+        }
+
+        // คำนวณยอดเงินสะสมเฉพาะของภารกิจนี้จากธุรกรรมในคลัง
+        let accumulated = 0;
+        if (loadedTxsCache) {
+            loadedTxsCache.forEach(tx => {
+                if (tx.owner === 'emergency') {
+                    const amt = parseFloat(tx.amount);
+                    const isMatch = tx.note && (tx.note.includes(`ภารกิจสำเร็จ: ${goalTitle}`) || tx.note.includes(`[ออมเพื่อ: ${goalTitle}]`));
+                    if (isMatch) {
+                        accumulated += (tx.type === 'income' ? amt : -amt);
+                    }
+                }
+            });
+        }
+
+        earmarkedAmount += accumulated;
+        const target = parseFloat(goal.amount) || 0;
+        const pct = target > 0 ? Math.min(100, Math.max(0, (accumulated / target) * 100)).toFixed(1) : '0.0';
+        const remaining = Math.max(0, target - accumulated);
+
+        jarItems.push({
+            id: goal.id,
+            title: goalTitle,
+            type: goalType,
+            accumulated: accumulated,
+            target: target,
+            pct: pct,
+            remaining: remaining
+        });
+    });
+
+    // 5. คำนวณเงินสำรองส่วนที่เหลือเป็น "เงินสำรองฉุกเฉินทั่วไป"
+    const generalBalance = totalEmergencyBalance - earmarkedAmount;
+    const generalPct = mainTargetVal > 0 ? Math.min(100, Math.max(0, (generalBalance / mainTargetVal) * 100)).toFixed(1) : '0.0';
+    const generalRemaining = Math.max(0, mainTargetVal - generalBalance);
+
+    // สร้าง HTML สำหรับโหลเงินสำรองทั่วไป (อันแรกเสมอ)
+    let jarsHtml = `
+        <div class="savings-jar-item p-3 mb-3 bg-light rounded-4 border" style="background-color: var(--light-bg) !important; border-color: var(--card-border) !important; color: var(--color-text);">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap" style="gap: 8px;">
+                <div class="d-flex align-items-center gap-1">
+                    <span class="fs-5">🚨</span>
+                    <input type="text" id="emergencyTargetTitleInput"
+                        onchange="updateEmergencyTargetTitle(this.value)"
+                        class="form-control form-control-sm fw-bold text-dark border-0 bg-transparent p-0"
+                        style="font-size: 0.85rem; width: auto; max-width: 140px; box-shadow: none !important; color: var(--text-dark) !important;"
+                        value="${mainTargetTitle}" placeholder="พิมพ์ชื่อเป้าหมาย...">
+                    <i class="bi bi-pencil-fill text-muted cursor-pointer" style="font-size: 0.65rem;"
+                        onclick="document.getElementById('emergencyTargetTitleInput').focus()"
+                        title="คลิกเพื่อแก้ไขชื่อเป้าหมาย"></i>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="small text-muted" style="font-size: 0.7rem;">เป้าหมาย:</span>
+                    <input type="number" id="emergencyTargetInput"
+                        onchange="updateEmergencyTarget(this.value)"
+                        class="form-control form-control-xs py-0.5 px-2 fw-bold text-dark border-secondary"
+                        style="width: 75px; font-size: 0.7rem; border-radius: 8px !important; display: inline-block; color: var(--text-dark) !important;"
+                        value="${mainTargetVal}">
+                    <span class="small text-muted" style="font-size: 0.7rem;">บ.</span>
+                </div>
+            </div>
+            <div class="row align-items-center g-2">
+                <div class="col-3 text-center">
+                    <div class="dream-jar-container" style="transform: scale(0.8); margin: 0 auto; width: 60px; height: 85px;">
+                        <div class="dream-jar-lid" style="width: 42px; height: 8px;"></div>
+                        <div class="dream-jar-neck" style="width: 45px; height: 6px; top: 7px;"></div>
+                        <div class="dream-jar" style="border-radius: 10px 10px 24px 24px;">
+                            <div id="dreamJarLiquid" class="dream-jar-liquid" style="height: ${generalPct}%;"></div>
+                            <div class="sparkle-particle" style="left:15px; animation-delay: 0.2s; width:4px; height:4px;"></div>
+                            <div class="sparkle-particle" style="left:30px; animation-delay: 0.8s; width:5px; height:5px;"></div>
+                            <div class="sparkle-particle" style="left:45px; animation-delay: 1.4s; width:4px; height:4px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-9">
+                    <div class="progress" style="height: 12px; border-radius: 6px;">
+                        <div id="emergencyProgressBar"
+                            class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                            role="progressbar"
+                            style="width: ${generalPct}%; border-radius: 6px; font-size: 0.65rem; font-weight: bold; line-height: 12px;">
+                            ${generalPct}%</div>
+                    </div>
+                    <div class="mt-2 text-xs">
+                        <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem;">
+                            <span>สะสมแล้ว: <b class="text-success" id="emergencyProgressCurrentText">${generalBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</b></span>
+                            <span id="emergencyProgressRemainingText">${generalRemaining <= 0 ? '🎉 สำเร็จ!' : `ยังขาดอีก: ${generalRemaining.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.`}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 6. เจน HTML สำหรับโหลอื่นๆ ของภารกิจออมเงิน
+    jarItems.forEach(item => {
+        let typeClass = item.type;
+        let progressBarColorClass = 'bg-success';
+        if (item.type === 'save_travel') progressBarColorClass = 'bg-info';
+        else if (item.type === 'save_shopping') progressBarColorClass = 'bg-danger';
+        else if (item.type === 'save_gift') progressBarColorClass = 'bg-success';
+        else if (item.type === 'save_investment') progressBarColorClass = 'bg-indigo';
+        else if (item.type === 'save_home') progressBarColorClass = 'bg-warning';
+        else if (item.type === 'save_car') progressBarColorClass = 'bg-warning';
+        else if (item.type === 'save_education') progressBarColorClass = 'bg-primary';
+        else if (item.type === 'save_health') progressBarColorClass = 'bg-success';
+
+        jarsHtml += `
+            <div class="savings-jar-item p-3 mb-3 bg-light rounded-4 border" style="background-color: var(--light-bg) !important; border-color: var(--card-border) !important; color: var(--color-text);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold text-dark d-flex align-items-center gap-1.5" style="font-size: 0.85rem; color: var(--text-dark) !important;">
+                        ${getGoalIcon(item.type)} ${item.title}
+                    </span>
+                    <span class="small text-muted fw-bold" style="font-size: 0.7rem;">เป้าหมาย: ${item.target.toLocaleString('th-TH')} บ.</span>
+                </div>
+                <div class="row align-items-center g-2">
+                    <div class="col-3 text-center">
+                        <div class="dream-jar-container" style="transform: scale(0.8); margin: 0 auto; width: 60px; height: 85px;">
+                            <div class="dream-jar-lid" style="width: 42px; height: 8px;"></div>
+                            <div class="dream-jar-neck" style="width: 45px; height: 6px; top: 7px;"></div>
+                            <div class="dream-jar" style="border-radius: 10px 10px 24px 24px;">
+                                <div class="dream-jar-liquid ${typeClass}" style="height: ${item.pct}%;"></div>
+                                <div class="sparkle-particle" style="left:15px; animation-delay: 0.2s; width:4px; height:4px;"></div>
+                                <div class="sparkle-particle" style="left:30px; animation-delay: 0.8s; width:5px; height:5px;"></div>
+                                <div class="sparkle-particle" style="left:45px; animation-delay: 1.4s; width:4px; height:4px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-9">
+                        <div class="progress" style="height: 12px; border-radius: 6px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated ${progressBarColorClass}"
+                                role="progressbar"
+                                style="width: ${item.pct}%; border-radius: 6px; font-size: 0.65rem; font-weight: bold; line-height: 12px;">
+                                ${item.pct}%</div>
+                        </div>
+                        <div class="mt-2 text-xs">
+                            <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem;">
+                                <span>สะสมแล้ว: <b class="text-success">${item.accumulated.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</b></span>
+                                <span>${item.remaining <= 0 ? '🎉 สำเร็จ!' : `ยังขาดอีก: ${item.remaining.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.`}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = jarsHtml;
 }
 
 function calculateAIInsights(txs, totalMePaidShared, totalPartnerPaidShared, goals) {
