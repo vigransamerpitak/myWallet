@@ -13,6 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="config.js"></script>
     <script src="app.js" defer></script>
     <script>
@@ -214,6 +215,37 @@
                 </div>
             </div>
 
+            <!-- หลอดความคืบหน้าเงินออมสำรองฉุกเฉิน & คำแนะนำการเงินอัจฉริยะ -->
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-md-6">
+                    <div class="premium-card mb-0 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <h6 class="fw-bold text-dark mb-0 d-flex align-items-center"><i class="bi bi-shield-fill-check text-success me-2"></i> ความคืบหน้าเงินออมฉุกเฉิน</h6>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="small text-muted" style="font-size: 0.75rem;">เป้าหมาย:</span>
+                                <input type="number" id="emergencyTargetInput" onchange="updateEmergencyTarget(this.value)" class="form-control form-control-xs py-0.5 px-2 fw-bold text-dark border-secondary" style="width: 85px; font-size: 0.75rem; border-radius: 8px !important; padding: 0.2rem 0.4rem !important;" value="50000">
+                                <span class="small text-muted" style="font-size: 0.75rem;">บ.</span>
+                            </div>
+                        </div>
+                        <div class="progress mt-3" style="height: 20px; border-radius: 10px;">
+                            <div id="emergencyProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%; border-radius: 10px; font-size: 0.75rem; font-weight: bold; line-height: 20px;">0%</div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-3 small">
+                            <span class="text-secondary fw-semibold">สะสมแล้ว: <span id="emergencyProgressCurrentText" class="text-success fw-bold">0.00 บาท</span></span>
+                            <span id="emergencyProgressRemainingText" class="text-muted">ยังขาดอีก: 50,000.00 บาท</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="premium-card mb-0 h-100" id="aiInsightCard" style="border: 1px solid rgba(99, 102, 241, 0.25) !important;">
+                        <h6 class="fw-bold text-dark mb-2 d-flex align-items-center"><i class="bi bi-chat-heart-fill text-indigo me-2"></i> คำแนะนำการเงินอัจฉริยะ</h6>
+                        <div id="aiInsightContent" class="small text-secondary">
+                            กำลังวิเคราะห์ข้อมูลรายรับรายจ่ายประจำเดือน...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-4 mb-4">
                 <div class="col-12 col-md-6">
                     <div class="card text-white border-0 p-3 shadow-sm" style="background: linear-gradient(135deg, #4f46e5, #3730a3); border-radius: 24px; min-height: 215px;">
@@ -295,6 +327,15 @@
                     <div class="col-12 col-md-4">
                         <label for="txNote" class="form-label small fw-bold text-secondary mb-1">บันทึกช่วยจำ (ถ้ามี)</label>
                         <input type="text" id="txNote" placeholder="กินชาบู, ซื้อของเข้าคอนโด" class="form-control form-control-lg">
+                        <!-- ปุ่มลัดคำจดจำด่วน -->
+                        <div class="preset-container">
+                            <button type="button" onclick="setNoteTag('ค่าอาหาร 🍔')" class="preset-btn">🍔 อาหาร</button>
+                            <button type="button" onclick="setNoteTag('ซื้อของเซเว่น 🏪')" class="preset-btn">🏪 เซเว่น</button>
+                            <button type="button" onclick="setNoteTag('เติมน้ำมัน ⛽')" class="preset-btn">⛽ น้ำมัน</button>
+                            <button type="button" onclick="setNoteTag('ชานมไข่มุก 🧋')" class="preset-btn">🧋 ชานม</button>
+                            <button type="button" onclick="setNoteTag('กาแฟ ☕')" class="preset-btn">☕ กาแฟ</button>
+                            <button type="button" onclick="setNoteTag('ของใช้เข้าบ้าน 🧹')" class="preset-btn">🧹 ของใช้บ้าน</button>
+                        </div>
                     </div>
                     <div class="col-12 col-md-4">
                         <label for="txOwner" class="form-label small fw-bold text-secondary mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน?</label>
@@ -305,6 +346,23 @@
                             <option value="shared-partner">🤝 เงินกองกลาง (คุณเอิร์น ออกก่อน)</option>
                             <option value="emergency">🚨 บัญชีออมสำรองฉุกเฉิน</option>
                         </select>
+                    </div>
+                </div>
+
+                <!-- ⚙️ ระบบหักออมอัตโนมัติเมื่อมีรายรับ -->
+                <div class="p-3 bg-light rounded-4 border mb-4">
+                    <div class="form-check form-switch d-flex align-items-center justify-content-between">
+                        <label class="form-check-label fw-bold text-dark small mb-0 cursor-pointer" for="autoSaveToggle">
+                            ⚙️ ระบบหักออมเงินอัตโนมัติเมื่อบันทึกรายรับ
+                        </label>
+                        <input class="form-check-input" type="checkbox" id="autoSaveToggle" onchange="toggleAutoSaveUI()">
+                    </div>
+                    <div id="autoSaveSettings" class="mt-2 d-none">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="small text-secondary">หักเงินรายรับ</span>
+                            <input type="number" id="autoSavePercent" class="form-control form-control-sm text-center fw-bold" style="width: 70px; border-radius: 8px !important;" value="10" min="1" max="100">
+                            <span class="small text-secondary">% จากกระเป๋าส่วนตัวโอนเข้าบัญชีออมฉุกเฉิน 🎯 อัตโนมัติ</span>
+                        </div>
                     </div>
                 </div>
 
@@ -398,6 +456,11 @@
             <div class="premium-card">
                 <h5 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-graph-up text-success me-2"></i> กราฟแนวโน้มรายเดือน (6 เดือนย้อนหลัง)</h5>
                 <div id="monthlyTrendArea"><p class="text-center text-muted py-4 small">กำลังโหลดกราฟ...</p></div>
+            </div>
+
+            <div class="premium-card">
+                <h5 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-shield-shaded text-success me-2"></i> กราฟสะสมเงินออมฉุกเฉิน (6 เดือนย้อนหลัง)</h5>
+                <div id="savingsTrendArea"><p class="text-center text-muted py-4 small">กำลังโหลดกราฟออมเงิน...</p></div>
             </div>
         </div>
     </div>
