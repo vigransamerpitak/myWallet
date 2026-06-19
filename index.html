@@ -206,7 +206,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card balance-card bg-my-wallet h-100">
                         <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
-                            <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าคุณโบ๊ท 🙋‍♂️</p>
+                            <p id="labelWalletMe" class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าคุณโบ๊ท 🙋‍♂️</p>
                             <h4 id="myTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
                         </div>
                     </div>
@@ -214,7 +214,7 @@
                 <div class="col-6 col-md-3">
                     <div class="card balance-card bg-partner-wallet h-100">
                         <div class="card-body p-2 text-center d-flex flex-column justify-content-center">
-                            <p class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าคุณเอิร์น 🙋‍♀️</p>
+                            <p id="labelWalletPartner" class="small fw-bold opacity-75 mb-1 text-truncate w-100">กระเป๋าคุณเอิร์น 🙋‍♀️</p>
                             <h4 id="partnerTotal" class="fw-bold mb-0 text-truncate" style="font-size: 1.15rem;">0.00 บาท</h4>
                         </div>
                     </div>
@@ -334,6 +334,29 @@
                     <button onclick="createNewGoalFrontend()" class="btn btn-indigo px-4 py-2 shadow-xs">➕ เพิ่มภารกิจลงหน้าจอ</button>
                 </div>
             </div>
+
+            <!-- ⚙️ แผงตั้งค่าชื่อกระเป๋าและผู้ใช้งานหน้าบ้าน -->
+            <div class="premium-card mt-4">
+                <div class="d-flex justify-content-between align-items-center" onclick="toggleSettingsPanel()" style="cursor: pointer; user-select: none;">
+                    <h6 class="fw-bold text-dark mb-0 d-flex align-items-center"><i class="bi bi-gear-fill text-indigo me-2"></i> ตั้งค่าชื่อผู้ใช้งาน & กระเป๋าเงิน (ไม่ต้องแก้โค้ดหลังบ้าน)</h6>
+                    <span id="settingsToggleIcon" class="text-muted small">คลิกเพื่อเปิดดู <i class="bi bi-chevron-down"></i></span>
+                </div>
+                <div id="settingsPanelBody" class="d-none mt-3 pt-3 border-top border-light border-opacity-25">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="inputNameMe" class="form-label small fw-bold text-secondary mb-1">👤 ชื่อผู้ใช้หลัก (คุณโบ๊ท)</label>
+                            <input type="text" id="inputNameMe" oninput="saveDynamicNames()" class="form-control" placeholder="ระบุชื่อผู้ใช้หลัก เช่น คุณโบ๊ท...">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="inputNamePartner" class="form-label small fw-bold text-secondary mb-1">👤 ชื่อผู้ใช้ร่วม (คุณเอิร์น)</label>
+                            <input type="text" id="inputNamePartner" oninput="saveDynamicNames()" class="form-control" placeholder="ระบุชื่อผู้ใช้ร่วม เช่น คุณเอิร์น...">
+                        </div>
+                    </div>
+                    <div class="form-text text-muted small mt-2">
+                        💡 เมื่อแก้ไขชื่อในกล่องด้านบน ระบบจะอัปเดตชื่อผู้ใช้บนแถบกระเป๋าเงิน, หน้าจดบันทึกประวัติ และคำแนะนำ AI หน้าบ้านทั้งหมดให้ทันทีโดยอัตโนมัติ!
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- ==================== 📝 TAB: RECORD / SCAN ==================== -->
@@ -383,10 +406,10 @@
                     <div class="col-12 col-md-4">
                         <label for="txOwner" class="form-label small fw-bold text-secondary mb-1">เงินส่วนนี้ผูกกับกระเป๋าไหน?</label>
                         <select id="txOwner" class="form-select form-control-lg fw-bold border-indigo text-indigo">
-                            <option value="me">🙋‍♂️ กระเป๋าส่วนตัว (คุณโบ๊ท)</option>
-                            <option value="partner">🙋‍♀️ กระเป๋าส่วนตัว (คุณเอิร์น)</option>
-                            <option value="shared-me">🤝 เงินกองกลาง (คุณโบ๊ท ออกก่อน)</option>
-                            <option value="shared-partner">🤝 เงินกองกลาง (คุณเอิร์น ออกก่อน)</option>
+                            <option value="me" id="optOwnerMe">🙋‍♂️ กระเป๋าส่วนตัว (คุณโบ๊ท)</option>
+                            <option value="partner" id="optOwnerPartner">🙋‍♀️ กระเป๋าส่วนตัว (คุณเอิร์น)</option>
+                            <option value="shared-me" id="optOwnerSharedMe">🤝 เงินกองกลาง (คุณโบ๊ท ออกก่อน)</option>
+                            <option value="shared-partner" id="optOwnerSharedPartner">🤝 เงินกองกลาง (คุณเอิร์น ออกก่อน)</option>
                             <option value="emergency">🚨 บัญชีออมสำรองฉุกเฉิน</option>
                         </select>
                     </div>

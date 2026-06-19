@@ -241,13 +241,15 @@ function clearAmount() {
 function initUserIdentity(userId) {
     const userDisplay = document.getElementById('userDisplay');
     const txOwnerInput = document.getElementById('txOwner');
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
     if (userId === '4ffee1dd-ff34-47c0-a623-7dcc76d80c0f') {
         currentUserRole = 'me';
-        userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">คุณโบ๊ท</span>`;
+        userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">${nameMe}</span>`;
         if (txOwnerInput) txOwnerInput.value = 'me';
     } else {
         currentUserRole = 'partner';
-        userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">คุณเอิร์น</span>`;
+        userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">${namePartner}</span>`;
         if (txOwnerInput) txOwnerInput.value = 'partner';
     }
 }
@@ -327,6 +329,9 @@ window.onload = function () {
 
             // โหลดตั้งค่าหัวข้อเป้าหมายออมฉุกเฉิน
             initEmergencyTargetTitle();
+
+            // โหลดตั้งค่าชื่อผู้ใช้งานแบบไดนามิก
+            initDynamicNames();
 
             // โหลดหมวดหมู่ และ โหลดตารางรายการเงินไปพร้อมๆ กัน ไม่ต้องรอคิว
             await Promise.all([loadCategories(), updateFilters()]);
@@ -820,7 +825,9 @@ async function saveTransaction(categoryName, type) {
             const pct = parseInt(localStorage.getItem('autoSavePercent')) || 10;
             const autoSaveAmt = parseFloat(((finalAmount * pct) / 100).toFixed(2));
             if (autoSaveAmt > 0) {
-                const ownerName = dbOwner === 'me' ? 'คุณโบ๊ท' : 'คุณเอิร์น';
+                const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+                const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+                const ownerName = dbOwner === 'me' ? nameMe : namePartner;
                 
                 // 1. สร้างรายการรายจ่ายหักออกจากกระเป๋าเดิม
                 const deductNote = `[หักออมอัตโนมัติ ${pct}%] ส่งเข้าบัญชีออมฉุกเฉิน`;
@@ -1271,13 +1278,16 @@ async function loadTransactions() {
     const endIdx = startIdx + ROWS_PER_PAGE;
     const pageItems = filteredTxsCache.slice(startIdx, endIdx);
 
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+
     pageItems.forEach(({ tx, txDate, txAmount, exactOwner, cleanNote }) => {
         let ownerBadge = '';
-        if (exactOwner === 'me') ownerBadge = '<span class="badge bg-primary-subtle text-primary">🙋‍♂️ คุณโบ๊ท</span>';
-        else if (exactOwner === 'partner') ownerBadge = '<span class="badge bg-danger-subtle text-danger">🙋‍♀️ คุณเอิร์น</span>';
+        if (exactOwner === 'me') ownerBadge = `<span class="badge bg-primary-subtle text-primary">🙋‍♂️ ${nameMe}</span>`;
+        else if (exactOwner === 'partner') ownerBadge = `<span class="badge bg-danger-subtle text-danger">🙋‍♀️ ${namePartner}</span>`;
         else if (exactOwner === 'emergency') ownerBadge = '<span class="badge bg-success text-white">🎯 ออมฉุกเฉิน</span>';
-        else if (exactOwner === 'shared-me') ownerBadge = '<span class="badge bg-warning text-dark">🤝 กองกลาง (โบ๊ทจ่าย)</span>';
-        else if (exactOwner === 'shared-partner') ownerBadge = '<span class="badge bg-warning text-dark">🤝 กองกลาง (เอิร์นจ่าย)</span>';
+        else if (exactOwner === 'shared-me') ownerBadge = `<span class="badge bg-warning text-dark">🤝 กองกลาง (${nameMe}จ่าย)</span>`;
+        else if (exactOwner === 'shared-partner') ownerBadge = `<span class="badge bg-warning text-dark">🤝 กองกลาง (${namePartner}จ่าย)</span>`;
         else ownerBadge = '<span class="badge bg-warning text-dark">🤝 กองกลาง</span>';
 
         let displayNoteText = cleanNote;
@@ -1385,7 +1395,16 @@ function exportCSV() {
     const BOM = '\uFEFF';
     const headers = ['วันที่', 'กระเป๋า', 'ประเภท', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึก'];
     const rows = filteredTxsCache.map(({ tx, txDate, txAmount, exactOwner }) => {
-        const ownerMap = { 'me': 'คุณโบ๊ท', 'partner': 'คุณเอิร์น', 'shared': 'กองกลาง', 'shared-me': 'กองกลาง (โบ๊ทจ่าย)', 'shared-partner': 'กองกลาง (เอิร์นจ่าย)', 'emergency': 'ออมฉุกเฉิน' };
+        const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+        const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+        const ownerMap = { 
+            'me': nameMe, 
+            'partner': namePartner, 
+            'shared': 'กองกลาง', 
+            'shared-me': `กองกลาง (${nameMe}จ่าย)`, 
+            'shared-partner': `กองกลาง (${namePartner}จ่าย)`, 
+            'emergency': 'ออมฉุกเฉิน' 
+        };
         const dateStr = txDate.toLocaleString('th-TH', { hour12: false });
         let note = (tx.note || '').replace(/\[SLIP_URL:.*?\]/g, '').replace(/\[จ่ายโดย:.*?\]/g, '').trim();
         // Escape double quotes in CSV
@@ -1589,4 +1608,87 @@ function updateSortHeadersUI() {
             }
         }
     });
+}
+
+// ⚙️ ระบบตั้งค่าชื่อและข้อมูลผู้ใช้แบบไดนามิกฝั่งหน้าบ้าน
+function initDynamicNames() {
+    const inputMe = document.getElementById('inputNameMe');
+    const inputPartner = document.getElementById('inputNamePartner');
+    
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+    
+    if (inputMe) inputMe.value = nameMe;
+    if (inputPartner) inputPartner.value = namePartner;
+    
+    applyDynamicNames();
+}
+
+function saveDynamicNames() {
+    const nameMe = document.getElementById('inputNameMe').value.trim() || 'คุณโบ๊ท';
+    const namePartner = document.getElementById('inputNamePartner').value.trim() || 'คุณเอิร์น';
+    
+    localStorage.setItem('nameMe', nameMe);
+    localStorage.setItem('namePartner', namePartner);
+    
+    applyDynamicNames();
+    
+    // โหลดข้อมูลประวัติและเควสอัปเดตการแสดงผลใหม่
+    loadTransactions();
+    loadGoals();
+}
+
+function applyDynamicNames() {
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+    
+    // อัปเดตการ์ดกระเป๋าเงินบน Dashboard
+    const labelWalletMe = document.getElementById('labelWalletMe');
+    if (labelWalletMe) labelWalletMe.innerText = `กระเป๋า${nameMe} 🙋‍♂️`;
+    
+    const labelWalletPartner = document.getElementById('labelWalletPartner');
+    if (labelWalletPartner) labelWalletPartner.innerText = `กระเป๋า${namePartner} 🙋‍♀️`;
+    
+    // อัปเดตตัวเลือกในกล่องดรอปดาวน์
+    const optOwnerMe = document.getElementById('optOwnerMe');
+    if (optOwnerMe) optOwnerMe.innerText = `🙋‍♂️ กระเป๋าส่วนตัว (${nameMe})`;
+    
+    const optOwnerPartner = document.getElementById('optOwnerPartner');
+    if (optOwnerPartner) optOwnerPartner.innerText = `🙋‍♀️ กระเป๋าส่วนตัว (${namePartner})`;
+    
+    const optOwnerSharedMe = document.getElementById('optOwnerSharedMe');
+    if (optOwnerSharedMe) optOwnerSharedMe.innerText = `🤝 เงินกองกลาง (${nameMe} ออกก่อน)`;
+    
+    const optOwnerSharedPartner = document.getElementById('optOwnerSharedPartner');
+    if (optOwnerSharedPartner) optOwnerSharedPartner.innerText = `🤝 เงินกองกลาง (${namePartner} ออกก่อน)`;
+    
+    // อัปเดตตัวกรองกระเป๋าเงินในประวัติ
+    const filterMe = document.querySelector("#filterOwner option[value='me']");
+    if (filterMe) filterMe.innerText = `🙋‍♂️ เฉพาะของ${nameMe}`;
+    
+    const filterPartner = document.querySelector("#filterOwner option[value='partner']");
+    if (filterPartner) filterPartner.innerText = `🙋‍♀️ เฉพาะของ${namePartner}`;
+    
+    // อัปเดตชื่อผู้ใช้งานระบบปัจจุบัน
+    const userDisplay = document.getElementById('userDisplay');
+    if (userDisplay) {
+        if (currentUserRole === 'me') {
+            userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">${nameMe}</span>`;
+        } else {
+            userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">${namePartner}</span>`;
+        }
+    }
+}
+
+function toggleSettingsPanel() {
+    const body = document.getElementById('settingsPanelBody');
+    const icon = document.getElementById('settingsToggleIcon');
+    if (!body || !icon) return;
+    if (body.classList.contains('d-none')) {
+        body.classList.remove('d-none');
+        icon.innerHTML = 'คลิกเพื่อย่อ <i class="bi bi-chevron-up"></i>';
+    } else {
+        body.classList.add('d-none');
+        icon.innerHTML = 'คลิกเพื่อเปิดดู <i class="bi bi-chevron-down"></i>';
+    }
 }
