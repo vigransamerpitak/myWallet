@@ -108,7 +108,7 @@ function setupSlipScannerListener() {
             });
 
             // 5. ส่งให้ Gemini ทำงานโดยใช้คีย์ที่เราดึงมาจาก Supabase เมื่อกี้
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${liveGeminiKey}`;
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${liveGeminiKey}`;
             const promptPayload = {
                 contents: [{
                     parts: [
