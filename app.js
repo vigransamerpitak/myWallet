@@ -1148,10 +1148,29 @@ async function settleGoal(id, status, title, amount, type) {
 }
 
 async function resetGoalStatus(id, title) {
-    if (!confirm(`คุณต้องการยกเลิกสถานะของภารกิจ "${title}" เพื่อกลับไปเลือกกดติ๊กถูก/กากบาทใหม่ ใช่หรือไม่?`)) return;
-    const { error } = await supabaseClient.from('goals').update({ is_completed: false, is_failed: false }).eq('id', id);
-    if (error) return showToast(error.message, '❌', true); showToast('รีเซ็ตสถานะภารกิจกลับคืนเรียบร้อย', '↩️');
+    if (!confirm(`คุณต้องการยกเลิกสถานะของภารกิจ "${title}" เพื่อกลับไปเลือกกดติ๊กถูก/กากบาทใหม่ ใช่หรือไม่?\n(ระบบจะลบรายการเงินที่สร้างขึ้นโดยอัตโนมัติออกให้ด้วย)`)) return;
+    
+    // 1. อัปเดตสถานะของเควสภารกิจให้กลับเป็นร่างปกติ
+    const { error: goalError } = await supabaseClient.from('goals').update({ is_completed: false, is_failed: false }).eq('id', id);
+    if (goalError) return showToast(goalError.message, '❌', true);
+
+    // 2. ลบธุรกรรมรายรับ/รายจ่ายที่ระบบเคยสร้างออโต้ออกไปเพื่อกู้คืนยอดสะสมและเงินคงเหลือ
+    const notePattern1 = `ภารกิจสำเร็จ: ${title}`;
+    const notePatternMe = `[จ่ายโดย: me] จ่ายบิลออโต้: ${title}`;
+    const notePatternPartner = `[จ่ายโดย: partner] จ่ายบิลออโต้: ${title}`;
+    
+    const { error: txError } = await supabaseClient
+        .from('transactions')
+        .delete()
+        .in('note', [notePattern1, notePatternMe, notePatternPartner]);
+
+    if (txError) {
+        console.warn("Could not delete associated transactions:", txError);
+    }
+
+    showToast('รีเซ็ตสถานะภารกิจและลบรายการเงินคืนค่าเรียบร้อย', '↩️');
     await loadGoals();
+    await loadTransactions();
 }
 
 async function deleteGoalFrontend(id) { if (!confirm('ต้องการลบภารกิจนี้ออกจากหน้าจอใช่ไหมครับ?')) return; const { error } = await supabaseClient.from('goals').delete().eq('id', id); if (error) showToast(error.message, '❌', true); else { showToast('ลบภารกิจออกแล้ว', '🗑️'); await loadGoals(); } }
