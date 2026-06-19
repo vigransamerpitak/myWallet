@@ -85,6 +85,12 @@ function getGoalIcon(type) {
     if (type === 'save_travel') return '✈️';
     if (type === 'save_shopping') return '🛍️';
     if (type === 'save_gift') return '🎁';
+    if (type === 'save_investment') return '📈';
+    if (type === 'save_home') return '🏠';
+    if (type === 'save_car') return '🚗';
+    if (type === 'save_education') return '🎓';
+    if (type === 'save_health') return '🏥';
+    if (type && type.startsWith('save_')) return '💰';
     return '📄';
 }
 
@@ -1273,7 +1279,15 @@ async function createNewGoalFrontend() {
     const title = titleInput.value.trim(); const amount = parseFloat(amountInput.value);
     if (!title || isNaN(amount) || amount <= 0) return showToast('กรุณากรอกชื่อเควสและยอดเงินตั้งเป้าหมายให้ถูกต้องครับ', '⚠️', true);
     const now = new Date(); const targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const { error } = await supabaseClient.from('goals').insert([{ title: title, amount: amount, type: typeInput.value, goal_month: targetMonthStr, is_completed: false, is_failed: false }]);
+    
+    let dbType = typeInput.value;
+    let dbTitle = title;
+    if (dbType.startsWith('save_')) {
+        dbTitle = `[${dbType}] ${title}`;
+        dbType = 'save';
+    }
+    
+    const { error } = await supabaseClient.from('goals').insert([{ title: dbTitle, amount: amount, type: dbType, goal_month: targetMonthStr, is_completed: false, is_failed: false }]);
     if (error) showToast(`เพิ่มภารกิจล้มเหลว: ${error.message}`, '❌', true); else { titleInput.value = ''; amountInput.value = ''; showToast('เพิ่มภารกิจลงหน้าจอสำเร็จแล้ว!', '➕'); triggerCelebration(); await loadGoals(); }
 }
 
@@ -1295,7 +1309,7 @@ async function loadGoals() {
     if (error) return console.error(error);
     if (goals.length === 0 && filterDate !== 'all') {
         const defaultGoals = [
-            { title: 'ออมเงินกองกลางไปเที่ยวญี่ปุ่น', amount: 2000, type: 'save', goal_month: targetMonthStr },
+            { title: '[save_travel] ออมเงินกองกลางไปเที่ยวญี่ปุ่น', amount: 2000, type: 'save', goal_month: targetMonthStr },
             { title: 'จ่ายค่าส่วนกลางคอนโด', amount: 1500, type: 'bill', goal_month: targetMonthStr },
             { title: 'หยอดกระปุกสำรองฉุกเฉินเพิ่ม', amount: 1000, type: 'save', goal_month: targetMonthStr }
         ];
@@ -1305,13 +1319,21 @@ async function loadGoals() {
     goalsList.innerHTML = '';
     if (!goals || goals.length === 0) { goalsList.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">ไม่มีภารกิจการเงินระบุไว้</p>'; return; }
     goals.forEach(goal => {
-        const safeTitle = escapeForAttr(goal.title);
+        let goalType = goal.type;
+        let goalTitle = goal.title;
+        const typeMatch = goalTitle.match(/^\[(save_[a-zA-Z0-9_]+)\]\s*/);
+        if (typeMatch) {
+            goalType = typeMatch[1];
+            goalTitle = goalTitle.replace(typeMatch[0], '');
+        }
+        
+        const safeTitle = escapeForAttr(goalTitle);
         const div = document.createElement('div'); div.className = "list-group-item d-flex justify-content-between align-items-center p-2 mb-1 bg-light rounded-3 border-0 text-sm shadow-2xs";
         let actionUI = '';
         if (goal.is_completed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-success">✅ สำเร็จ</span><button onclick="resetGoalStatus(${goal.id}, '${safeTitle}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
         else if (goal.is_failed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-secondary text-dark">❌ ข้าม</span><button onclick="resetGoalStatus(${goal.id}, '${safeTitle}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
-        else { actionUI = `<div class="btn-group btn-group-sm" style="border-radius:8px; overflow:hidden;"><button onclick="settleGoal(${goal.id}, 'success', '${safeTitle}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-success py-0.5 px-2 cursor-pointer">✅ ออมแล้ว</button><button onclick="settleGoal(${goal.id}, 'failed', '${safeTitle}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-danger py-0.5 px-2 cursor-pointer">❌ ข้าม</button><button onclick="deleteGoalFrontend(${goal.id})" class="btn btn-link text-muted p-0 px-1 ms-1 text-xs cursor-pointer" title="ลบถาวร">🗑️</button></div>`; }
-        div.innerHTML = `<div class="text-truncate me-2"><span class="${goal.is_completed ? 'text-decoration-line-through text-muted' : goal.is_failed ? 'text-decoration-line-through text-black-50 font-normal' : 'fw-semibold text-dark'}">${getGoalIcon(goal.type)} ${goal.title}</span></div><div class="d-flex align-items-center gap-2 shrink-0"><span class="fw-bold text-dark">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>${actionUI}</div>`;
+        else { actionUI = `<div class="btn-group btn-group-sm" style="border-radius:8px; overflow:hidden;"><button onclick="settleGoal(${goal.id}, 'success', '${safeTitle}', ${goal.amount}, '${goalType}')" class="btn btn-outline-success py-0.5 px-2 cursor-pointer">✅ ออมแล้ว</button><button onclick="settleGoal(${goal.id}, 'failed', '${safeTitle}', ${goal.amount}, '${goalType}')" class="btn btn-outline-danger py-0.5 px-2 cursor-pointer">❌ ข้าม</button><button onclick="deleteGoalFrontend(${goal.id})" class="btn btn-link text-muted p-0 px-1 ms-1 text-xs cursor-pointer" title="ลบถาวร">🗑️</button></div>`; }
+        div.innerHTML = `<div class="text-truncate me-2"><span class="${goal.is_completed ? 'text-decoration-line-through text-muted' : goal.is_failed ? 'text-decoration-line-through text-black-50 font-normal' : 'fw-semibold text-dark'}">${getGoalIcon(goalType)} ${goalTitle}</span></div><div class="d-flex align-items-center gap-2 shrink-0"><span class="fw-bold text-dark">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>${actionUI}</div>`;
         goalsList.appendChild(div);
     });
     loadedGoalsCache = goals || [];
@@ -1334,6 +1356,12 @@ async function settleGoal(id, status, title, amount, type) {
         realTitle = goalData.title;
         realAmount = goalData.amount;
         realType = goalData.type;
+        
+        const typeMatch = realTitle.match(/^\[(save_[a-zA-Z0-9_]+)\]\s*/);
+        if (typeMatch) {
+            realType = typeMatch[1];
+            realTitle = realTitle.replace(typeMatch[0], '');
+        }
     }
 
     if (status === 'success') {
@@ -1346,6 +1374,12 @@ async function settleGoal(id, status, title, amount, type) {
             if (realType === 'save_travel') emoji = '✈️';
             else if (realType === 'save_shopping') emoji = '🛍️';
             else if (realType === 'save_gift') emoji = '🎁';
+            else if (realType === 'save_investment') emoji = '📈';
+            else if (realType === 'save_home') emoji = '🏠';
+            else if (realType === 'save_car') emoji = '🚗';
+            else if (realType === 'save_education') emoji = '🎓';
+            else if (realType === 'save_health') emoji = '🏥';
+            else if (realType.startsWith('save_')) emoji = '💰';
             
             // 1. หักเงินออมจากกระเป๋าผู้ใช้จริงที่กดเคลียร์ภารกิจ
             await supabaseClient.from('transactions').insert([{
