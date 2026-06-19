@@ -1,6 +1,6 @@
 {
   "name": "Couple Wallet & Savings App",
-  "short_name": "คู่รักนักออม",
+  "short_name": "บันทึกรายรับ-รายจ่าย",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#f3f4f6",
