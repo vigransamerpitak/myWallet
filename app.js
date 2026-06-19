@@ -1694,22 +1694,38 @@ function renderMonthlyTrend(allTxs) {
     // หาค่า max สำหรับ scale แท่ง
     const maxVal = Math.max(...monthlyData.map(m => Math.max(m.income, m.expense)), 1);
 
-    let html = `<div class="d-flex align-items-end justify-content-between gap-1" style="height: 180px; padding-bottom: 4px;">`;
+    let html = `<div class="d-flex align-items-end justify-content-between gap-1" style="height: 195px; padding-bottom: 4px;">`;
 
     monthlyData.forEach((m, i) => {
-        const incomeH = Math.max(2, (m.income / maxVal) * 150);
-        const expenseH = Math.max(2, (m.expense / maxVal) * 150);
+        const incomeH = Math.max(2, (m.income / maxVal) * 125);
+        const expenseH = Math.max(2, (m.expense / maxVal) * 125);
         const isCurrentMonth = (i === monthlyData.length - 1);
 
         html += `<div class="d-flex flex-column align-items-center flex-fill" style="min-width: 0;">`;
-        // แท่งคู่ (รายรับ + รายจ่าย)
-        html += `<div class="d-flex align-items-end gap-1 mb-1" style="height: 155px;">`;
+        
+        // 1. ตัวเลขรายรับ/รายจ่ายซ้อนกันแนวตั้ง ป้องกันการชนกันแนวนอน
+        html += `<div class="d-flex flex-column align-items-center mb-1 text-center" style="font-size: 0.55rem; line-height: 1.2; min-height: 28px; justify-content: end;">`;
+        if (m.income > 0) {
+            html += `<span class="text-success fw-bold" title="รายรับ: ${m.income.toLocaleString()} บาท">+${m.income.toLocaleString('th-TH', { maximumFractionDigits: 0 })}</span>`;
+        } else {
+            html += `<span class="text-success text-opacity-50" style="opacity: 0.4;">0</span>`;
+        }
+        if (m.expense > 0) {
+            html += `<span class="text-danger fw-bold" title="รายจ่าย: ${m.expense.toLocaleString()} บาท">-${m.expense.toLocaleString('th-TH', { maximumFractionDigits: 0 })}</span>`;
+        } else {
+            html += `<span class="text-danger text-opacity-50" style="opacity: 0.4;">0</span>`;
+        }
+        html += `</div>`;
+
+        // 2. แท่งคู่ (รายรับ + รายจ่าย)
+        html += `<div class="d-flex align-items-end gap-1 mb-1" style="height: 130px;">`;
         // แท่งรายรับ (เขียว)
         html += `<div title="รายรับ: ${m.income.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บ." style="width: 14px; height: ${incomeH}px; background: linear-gradient(180deg, #34d399, #059669); border-radius: 4px 4px 0 0; transition: height 0.4s ease;"></div>`;
         // แท่งรายจ่าย (แดง)
         html += `<div title="รายจ่าย: ${m.expense.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บ." style="width: 14px; height: ${expenseH}px; background: linear-gradient(180deg, #f87171, #dc2626); border-radius: 4px 4px 0 0; transition: height 0.4s ease;"></div>`;
         html += `</div>`;
-        // ชื่อเดือน
+        
+        // 3. ชื่อเดือน
         html += `<span class="text-center small ${isCurrentMonth ? 'fw-bold text-primary' : 'text-muted'}" style="font-size: 0.65rem; line-height: 1.1;">${m.label}</span>`;
         html += `</div>`;
     });
