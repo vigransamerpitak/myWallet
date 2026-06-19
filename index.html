@@ -521,6 +521,212 @@
         #monthlyReportPrintLayout {
             display: none;
         }
+
+        /* ==================== 🍯 COUPLE FEATURES: SAVINGS JAR & LEVEL CSS ==================== */
+        .dream-jar-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 1rem auto;
+            width: 140px;
+            height: 180px;
+            position: relative;
+        }
+        .dream-jar {
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            border: 4px solid rgba(255, 255, 255, 0.8);
+            border-top: none;
+            border-radius: 20px 20px 50px 50px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 8px 16px rgba(255, 255, 255, 0.3),
+                        0 10px 25px rgba(0, 0, 0, 0.08);
+            backdrop-filter: blur(5px);
+        }
+        [data-theme="dark"] .dream-jar {
+            background: rgba(30, 41, 59, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        .dream-jar-lid {
+            width: 90px;
+            height: 18px;
+            background: linear-gradient(180deg, #d4a373, #a98467);
+            border-radius: 8px;
+            position: absolute;
+            top: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .dream-jar-neck {
+            width: 100px;
+            height: 12px;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 4px;
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+        }
+        [data-theme="dark"] .dream-jar-neck {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        .dream-jar-liquid {
+            width: 200%;
+            height: 0%; /* Dynamic from JS */
+            background: linear-gradient(180deg, #ffb703, #fb8500);
+            position: absolute;
+            bottom: 0;
+            left: -50%;
+            border-radius: 38%;
+            animation: wave-animation 6s infinite linear;
+            transition: height 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 15px rgba(251, 133, 0, 0.4);
+        }
+        .dream-jar-liquid-top {
+            width: 100%;
+            height: 10px;
+            background: rgba(255,255,255,0.2);
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        @keyframes wave-animation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Sparkles / Heart bubbles floating inside Jar */
+        .sparkle-particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float-up 3s infinite ease-in;
+        }
+        @keyframes float-up {
+            0% { transform: translateY(120px) scale(0); opacity: 0; }
+            50% { opacity: 0.8; }
+            100% { transform: translateY(-10px) scale(1.2); opacity: 0; }
+        }
+        
+        /* Mascot EXP bar and level info styling */
+        .mascot-exp-container {
+            width: 100%;
+            max-width: 130px;
+            margin: 6px auto 0 auto;
+        }
+        .mascot-level-badge {
+            font-size: 0.7rem !important;
+            font-weight: 700;
+            padding: 3px 8px !important;
+            border-radius: 10px !important;
+            margin-bottom: 3px;
+            display: inline-block;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .mascot-exp-bar {
+            height: 6px;
+            background-color: var(--light-bg);
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+        }
+        .mascot-exp-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            width: 0%; /* Dynamic from JS */
+            border-radius: 3px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Emotion Selector styling in Record Box */
+        .emotion-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .emotion-btn {
+            flex: 1;
+            border: 1.5px solid var(--card-border);
+            background-color: var(--card-bg);
+            border-radius: 14px;
+            padding: 8px;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--color-text);
+        }
+        .emotion-btn:hover {
+            transform: translateY(-2px);
+            border-color: #6366f1;
+            background-color: var(--light-bg);
+        }
+        .emotion-btn.active {
+            border-color: #6366f1;
+            background: linear-gradient(135deg, #eff6ff, #e0e7ff);
+            color: #4f46e5;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+            transform: scale(1.05);
+        }
+        [data-theme="dark"] .emotion-btn.active {
+            background: linear-gradient(135deg, #1e293b, #312e81);
+            color: #818cf8;
+            border-color: #818cf8;
+        }
+        .emotion-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            opacity: 0.8;
+        }
+        
+        /* Custom modal for hugs notification */
+        .hug-notification-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s ease;
+        }
+        .hug-notification-card {
+            background: white;
+            border-radius: 28px;
+            width: 90%;
+            max-width: 400px;
+            padding: 2rem;
+            text-align: center;
+            border: 4px solid #fca5a5;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        [data-theme="dark"] .hug-notification-card {
+            background: #111a36;
+            border-color: #f43f5e;
+            color: #cbd5e1;
+        }
+        .hug-animated-heart {
+            font-size: 4rem;
+            animation: heartbeat-pop 1.2s infinite alternate;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        @keyframes heartbeat-pop {
+            0% { transform: scale(1); filter: drop-shadow(0 0 5px rgba(244,63,94,0.3)); }
+            100% { transform: scale(1.2); filter: drop-shadow(0 0 15px rgba(244,63,94,0.6)); }
+        }
     </style>
 </head>
 
@@ -657,17 +863,39 @@
                                 <span class="small text-muted" style="font-size: 0.75rem;">บ.</span>
                             </div>
                         </div>
-                        <div class="progress mt-3" style="height: 20px; border-radius: 10px;">
-                            <div id="emergencyProgressBar"
-                                class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                                role="progressbar"
-                                style="width: 0%; border-radius: 10px; font-size: 0.75rem; font-weight: bold; line-height: 20px;">
-                                0%</div>
-                        </div>
-                        <div class="d-flex justify-content-between mt-3 small">
-                            <span class="text-secondary fw-semibold">สะสมแล้ว: <span id="emergencyProgressCurrentText"
-                                    class="text-success fw-bold">0.00 บาท</span></span>
-                            <span id="emergencyProgressRemainingText" class="text-muted">ยังขาดอีก: 50,000.00 บาท</span>
+                        <div class="row align-items-center g-2 mt-2">
+                            <!-- Left: Honey Jar -->
+                            <div class="col-4 text-center">
+                                <div class="dream-jar-container">
+                                    <div class="dream-jar-lid"></div>
+                                    <div class="dream-jar-neck"></div>
+                                    <div class="dream-jar">
+                                        <div id="dreamJarLiquid" class="dream-jar-liquid">
+                                            <div class="dream-jar-liquid-top"></div>
+                                        </div>
+                                        <!-- Bubbles generated here -->
+                                        <div class="sparkle-particle" style="left:20px; animation-delay: 0.2s; width:6px; height:6px;"></div>
+                                        <div class="sparkle-particle" style="left:50px; animation-delay: 0.8s; width:8px; height:8px;"></div>
+                                        <div class="sparkle-particle" style="left:80px; animation-delay: 1.4s; width:5px; height:5px;"></div>
+                                        <div class="sparkle-particle" style="left:110px; animation-delay: 2s; width:7px; height:7px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Right: Progress Info -->
+                            <div class="col-8">
+                                <div class="progress animate-pulse" style="height: 16px; border-radius: 8px;">
+                                    <div id="emergencyProgressBar"
+                                        class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                        role="progressbar"
+                                        style="width: 0%; border-radius: 8px; font-size: 0.7rem; font-weight: bold; line-height: 16px;">
+                                        0%</div>
+                                </div>
+                                <div class="mt-3 small">
+                                    <div class="mb-1 text-secondary fw-semibold">สะสมแล้ว:</div>
+                                    <h5 id="emergencyProgressCurrentText" class="text-success fw-extrabold mb-1">0.00 บาท</h5>
+                                    <div id="emergencyProgressRemainingText" class="text-muted" style="font-size: 0.72rem;">ยังขาดอีก: 50,000.00 บาท</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -679,6 +907,12 @@
                             <div class="bear-mascot-wrapper text-center">
                                 <div id="bearMascot" class="bear-mascot animated-bounce" style="font-size: 3rem;">🐻</div>
                                 <span id="bearBadge" class="badge bg-indigo text-white mt-1" style="font-size: 0.65rem;">พี่หมี AI</span>
+                                <div class="mascot-exp-container" title="จดบันทึกและโอนเงินเพื่อสะสม EXP ให้พี่หมีโตขึ้น!">
+                                    <span id="mascotLevelText" class="mascot-level-badge badge bg-secondary">Lv.1 หมีหัดออม</span>
+                                    <div class="mascot-exp-bar">
+                                        <div id="mascotExpProgress" class="mascot-exp-progress"></div>
+                                    </div>
+                                </div>
                             </div>
                             <!-- คำแนะนำการเงิน -->
                             <div class="flex-fill">
@@ -691,6 +925,12 @@
                                         <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 70%;"></div>
                                         <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 90%;"></div>
                                     </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-light border-opacity-10 flex-wrap gap-2">
+                                    <span class="small text-muted" style="font-size: 0.68rem;">สะสม EXP: บันทึก = +15 | ภารกิจสำเร็จ = +100</span>
+                                    <button onclick="sendSystemHugToPartner()" class="btn btn-outline-danger btn-xs py-1 px-2.5 rounded-pill fw-bold">
+                                        🫂 ส่งกอดปลอบใจแฟน
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -953,6 +1193,29 @@
                             </option>
                             <option value="emergency" id="optOwnerEmergency">🚨 บัญชีออมสำรองฉุกเฉิน</option>
                         </select>
+                    </div>
+                </div>
+
+                <!-- 💬 เลือกอารมณ์ความรู้สึกตอนจ่ายเงิน (เฉพาะรายจ่าย) -->
+                <div id="spendEmotionArea" class="mb-4">
+                    <label class="form-label small fw-bold text-secondary mb-1">💬 อารมณ์และความรู้สึกตอนใช้จ่ายครั้งนี้ (ทางเลือก)</label>
+                    <div class="emotion-container">
+                        <button type="button" onclick="selectSpendEmotion('🥰', this)" class="emotion-btn">
+                            <span>🥰</span>
+                            <span class="emotion-label">ให้รางวัลตัวเอง</span>
+                        </button>
+                        <button type="button" onclick="selectSpendEmotion('🛒', this)" class="emotion-btn">
+                            <span>🛒</span>
+                            <span class="emotion-label">จำเป็นต้องใช้</span>
+                        </button>
+                        <button type="button" onclick="selectSpendEmotion('💸', this)" class="emotion-btn">
+                            <span>💸</span>
+                            <span class="emotion-label">ฟุ่มเฟือยไปนิด</span>
+                        </button>
+                        <button type="button" onclick="selectSpendEmotion('💔', this)" class="emotion-btn">
+                            <span>💔</span>
+                            <span class="emotion-label">รู้งี้ไม่ซื้อดีกว่า</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1277,6 +1540,18 @@
 
     <!-- ==================== 📄 TEMPLATE: PRINT REPORT PDF ==================== -->
     <div id="monthlyReportPrintLayout"></div>
+
+    <!-- 🫂 POPUP: HUGS & EMOTION SUPPORT ALERT -->
+    <div id="hugNotificationOverlay" class="hug-notification-overlay d-none">
+        <div class="hug-notification-card">
+            <span class="hug-animated-heart">🫂❤️</span>
+            <h4 class="fw-bold text-danger mb-2">ได้รับอ้อมกอดอุ่นๆ จ้า!</h4>
+            <p id="hugNotificationMessage" class="fw-semibold text-dark mb-4">แฟนของคุณส่งอ้อมกอดอุ่นๆ และกำลังใจก้อนโตมาให้คุณนะ! 💖</p>
+            <button onclick="closeHugNotification()" class="btn btn-indigo rounded-pill px-4 py-2 w-100 fw-bold">
+                🥰 รับกอดด้วยความยินดี
+            </button>
+        </div>
+    </div>
 
 </body>
 

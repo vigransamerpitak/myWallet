@@ -105,6 +105,12 @@ function calculateEmergencyProgress() {
         progressBar.innerText = `${pct}%`;
     }
     
+    // Update Dream Savings Jar honey liquid level!
+    const dreamJarLiquid = document.getElementById('dreamJarLiquid');
+    if (dreamJarLiquid) {
+        dreamJarLiquid.style.height = `${pct}%`;
+    }
+    
     const currentText = document.getElementById('emergencyProgressCurrentText');
     if (currentText) {
         currentText.innerText = `${currentVal.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`;
@@ -237,6 +243,7 @@ function calculateAIInsights(txs, totalMePaidShared, totalPartnerPaidShared, goa
 function updateInsightsAndProgress() {
     calculateEmergencyProgress();
     calculateAIInsights(loadedTxsCache, currentTotalMePaidShared, currentTotalPartnerPaidShared, loadedGoalsCache);
+    updateBearMascotLevel(loadedTxsCache, loadedGoalsCache);
 }
 
 // === ฟังก์ชันสำหรับระบบ UI/UX แท็บ, โหมดถนอมสายตา และการจัดการยอดเงิน ===
@@ -892,6 +899,9 @@ async function saveTransaction(categoryName, type) {
 
     let dbOwner = ownerInput.value;
     let finalNote = noteInput.value.trim();
+    if (type === 'expense' && currentSpendEmotion) {
+        finalNote = `[อารมณ์: ${currentSpendEmotion}] ${finalNote}`.trim();
+    }
 
     // 🎯 ดึงและแนบวัตถุประสงค์การออมย่อยในโน้ต (เฉพาะเมื่อเป็นกระเป๋าเงินออมฉุกเฉิน)
     const savingPurposeInput = document.getElementById('txSavingPurpose');
@@ -932,6 +942,9 @@ async function saveTransaction(categoryName, type) {
         showToast(`บันทึกไม่สำเร็จ: ${error.message}`, '❌', true);
     } else {
         amountInput.value = ''; noteInput.value = ''; if (slipInput) slipInput.value = '';
+        currentSpendEmotion = '';
+        const emotionButtons = document.querySelectorAll('.emotion-btn');
+        emotionButtons.forEach(btn => btn.classList.remove('active'));
         if (savingPurposeInput) {
             savingPurposeInput.value = '';
             document.getElementById('emergencyPurposeArea').classList.add('d-none');
@@ -1493,6 +1506,20 @@ async function loadTransactions() {
         const txDate = new Date(tx.created_at); const txAmount = parseFloat(tx.amount); const value = tx.type === 'income' ? txAmount : -txAmount;
 
         let exactOwner = tx.owner; let cleanNote = tx.note || '';
+        
+        // 🫂 SYSTEM HUG message checker
+        if (cleanNote.startsWith('[SYSTEM_HUG]')) {
+            handleReceivedHug(tx);
+            return;
+        }
+
+        let emotion = '';
+        const emotionMatch = cleanNote.match(/^\[อารมณ์:\s*(.*?)\]\s*/);
+        if (emotionMatch) {
+            emotion = emotionMatch[1];
+            cleanNote = cleanNote.replace(emotionMatch[0], '');
+        }
+
         if (tx.owner === 'shared') {
             if (cleanNote.startsWith('[จ่ายโดย: me]')) { exactOwner = 'shared-me'; cleanNote = cleanNote.replace('[จ่ายโดย: me] ', '').replace('[จ่ายโดย: me]', ''); }
             else if (cleanNote.startsWith('[จ่ายโดย: partner]')) { exactOwner = 'shared-partner'; cleanNote = cleanNote.replace('[จ่ายโดย: partner] ', '').replace('[จ่ายโดย: partner]', ''); }
@@ -1554,7 +1581,7 @@ async function loadTransactions() {
         if (!passOwnerFilter || !passTypeFilter || !isCurrentFilterMonth) return;
 
         // เก็บเข้า cache สำหรับ pagination
-        filteredTxsCache.push({ tx, txDate, txAmount, exactOwner, cleanNote });
+        filteredTxsCache.push({ tx, txDate, txAmount, exactOwner, cleanNote, emotion });
     });
 
     // 🔄 ดำเนินการเรียงลำดับข้อมูลตามที่ผู้เลือก (Sort column)
@@ -1596,7 +1623,7 @@ async function loadTransactions() {
     const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
     const emergencyTitle = localStorage.getItem('emergencyTargetTitle') || 'เงินออมสำรองฉุกเฉิน';
 
-    pageItems.forEach(({ tx, txDate, txAmount, exactOwner, cleanNote }) => {
+    pageItems.forEach(({ tx, txDate, txAmount, exactOwner, cleanNote, emotion }) => {
         let ownerBadge = '';
         if (exactOwner === 'me') ownerBadge = `<span class="badge bg-primary-subtle text-primary">🙋‍♂️ ${nameMe}</span>`;
         else if (exactOwner === 'partner') ownerBadge = `<span class="badge bg-danger-subtle text-danger">🙋‍♀️ ${namePartner}</span>`;
@@ -1624,7 +1651,10 @@ async function loadTransactions() {
                 ${tx.category_name === 'สลิปรอระบุหมวดหมู่' ? '⏳ รอระบุหมวดหมู่' : getCategoryEmoji(tx.category_name)}
             </td>
             <td class="fw-bold">${txAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</td>
-            <td class="text-muted small">${displayNoteText || '-'}</td>
+            <td class="text-muted small">
+                ${emotion ? `<span class="badge bg-light text-dark rounded-pill border me-1">${emotion}</span>` : ''}
+                ${displayNoteText || '-'}
+            </td>
             <td class="text-center whitespace-nowrap">
                 <button onclick="enterEditMode(${tx.id}, ${txAmount}, '${safeNote}', '${safeOwner}', '${safeCategory}')" class="btn btn-outline-warning btn-sm py-0 px-2 cursor-pointer" style="border-radius:6px;">✏️ แก้</button>
                 <button onclick="deleteTransaction(${tx.id})" data-delete-id="${tx.id}" class="btn btn-outline-danger btn-sm py-0 px-2 cursor-pointer" style="border-radius:6px;">🗑️ ลบ</button>
@@ -2872,4 +2902,145 @@ function generateMonthlyReportPDF() {
 
     // เรียกหน้าต่างพิมพ์เฉพาะเอกสาร PDF
     window.print();
+}
+
+// ==================== 🍯 COUPLE INTERACTIVE FEATURES LOGIC ====================
+let currentSpendEmotion = '';
+
+function selectSpendEmotion(emotion, element) {
+    const buttons = document.querySelectorAll('.emotion-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    if (currentSpendEmotion === emotion) {
+        currentSpendEmotion = ''; // toggle off
+    } else {
+        currentSpendEmotion = emotion;
+        if (element) element.classList.add('active');
+    }
+}
+
+function closeHugNotification() {
+    const overlay = document.getElementById('hugNotificationOverlay');
+    if (overlay) overlay.classList.add('d-none');
+}
+
+function handleReceivedHug(tx) {
+    const lastShownId = localStorage.getItem('lastShownHugId');
+    if (lastShownId === null) {
+        // First run on clean browser: set to current hug transaction ID to only show FUTURE ones
+        localStorage.setItem('lastShownHugId', tx.id);
+        return;
+    }
+    
+    if (tx.id > parseInt(lastShownId)) {
+        const overlay = document.getElementById('hugNotificationOverlay');
+        const msgEl = document.getElementById('hugNotificationMessage');
+        if (overlay && msgEl) {
+            msgEl.innerText = tx.note.replace('[SYSTEM_HUG] ', '').replace('[SYSTEM_HUG]', '').trim();
+            overlay.classList.remove('d-none');
+            triggerCelebration();
+            localStorage.setItem('lastShownHugId', tx.id);
+        }
+    }
+}
+
+async function sendSystemHugToPartner() {
+    if (isSaving) return;
+    
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+    
+    let senderName = currentUserRole === 'me' ? nameMe : namePartner;
+    let receiverName = currentUserRole === 'me' ? namePartner : nameMe;
+    
+    const message = `คุณ${senderName} ส่งอ้อมกอดอุ่นๆ และกำลังใจก้อนโตมาให้คุณ${receiverName}นะ! 🫂💖`;
+    const noteContent = `[SYSTEM_HUG] ${message}`;
+    
+    showToast('กำลังส่งอ้อมกอดให้แฟน...', '🫂');
+    isSaving = true;
+    
+    try {
+        const { error } = await supabaseClient
+            .from('transactions')
+            .insert([{
+                amount: 0,
+                type: 'income',
+                category_name: 'ของขวัญ',
+                note: noteContent,
+                owner: 'shared',
+                created_at: new Date().toISOString()
+            }]);
+            
+        if (error) throw error;
+        
+        showToast('ส่งอ้อมกอดให้แฟนเรียบร้อยแล้วจ้า! 🫂❤️', '💖');
+        triggerCelebration();
+        loadTransactions();
+    } catch (err) {
+        console.error(err);
+        showToast(`ส่งกอดไม่สำเร็จ: ${err.message}`, '❌', true);
+    } finally {
+        isSaving = false;
+    }
+}
+
+function updateBearMascotLevel(txs, goals) {
+    const levelTextEl = document.getElementById('mascotLevelText');
+    const expProgressEl = document.getElementById('mascotExpProgress');
+    if (!levelTextEl || !expProgressEl) return;
+    
+    const normalTxs = txs.filter(tx => !tx.note || !tx.note.startsWith('[SYSTEM_HUG]'));
+    const txCount = normalTxs.length;
+    
+    const completedGoalsCount = goals ? goals.filter(g => g.is_completed).length : 0;
+    
+    const emergencyTotalEl = document.getElementById('emergencyTotal');
+    const emergencyTotal = emergencyTotalEl ? parseFloat(emergencyTotalEl.innerText.replace(/[^0-9.-]+/g,"")) || 0 : 0;
+    
+    const txExp = txCount * 15;
+    const goalExp = completedGoalsCount * 100;
+    const savingsExp = Math.floor(Math.max(0, emergencyTotal) / 100) * 2;
+    const totalExp = txExp + goalExp + savingsExp;
+    
+    const levels = [
+        { min: 0, max: 100, name: 'หมีน้อยหัดออม 🐻' },
+        { min: 100, max: 300, name: 'หมีวัยรุ่นสร้างตัว 🐻👔' },
+        { min: 300, max: 600, name: 'หมีนักวางแผน 🐻🎓' },
+        { min: 600, max: 1000, name: 'หมีเศรษฐีคู่รัก 🐻👑' },
+        { min: 1000, max: 1500, name: 'หมีนักลงทุน 🐼📈' },
+        { min: 1500, max: 2100, name: 'หมีสายเปย์คู่รัก 🐼💝' },
+        { min: 2100, max: 2800, name: 'หมีผู้มั่งคั่ง 🐻💰' },
+        { min: 2800, max: 3600, name: 'เทพเจ้าการเงิน 🐼👑' },
+        { min: 3600, max: 4500, name: 'หมีร่างทอง 👑✨' },
+        { min: 4500, max: Infinity, name: 'เศรษฐีนีแอนด์บอส 💎👑' }
+    ];
+    
+    let currentLvlIdx = 0;
+    for (let i = 0; i < levels.length; i++) {
+        if (totalExp >= levels[i].min && totalExp < levels[i].max) {
+            currentLvlIdx = i;
+            break;
+        }
+    }
+    if (totalExp >= 4500) currentLvlIdx = levels.length - 1;
+    
+    const curLevel = levels[currentLvlIdx];
+    const lvlNum = currentLvlIdx + 1;
+    
+    levelTextEl.innerText = `Lv.${lvlNum} ${curLevel.name}`;
+    
+    let pct = 100;
+    if (curLevel.max !== Infinity) {
+        const range = curLevel.max - curLevel.min;
+        const currentProgress = totalExp - curLevel.min;
+        pct = Math.min(100, Math.max(0, (currentProgress / range) * 100));
+    }
+    
+    expProgressEl.style.width = `${pct}%`;
+    
+    const expBarContainer = document.querySelector('.mascot-exp-container');
+    if (expBarContainer) {
+        const nextText = curLevel.max === Infinity ? 'MAX' : `${totalExp} / ${curLevel.max}`;
+        expBarContainer.title = `เลเวลพี่หมี AI: Lv.${lvlNum} (${curLevel.name})\nEXP ปัจจุบัน: ${totalExp} XP\nความก้าวหน้าเลเวลถัดไป: ${nextText} XP (บันทึก = +15 | ภารกิจสำเร็จ = +100 | ออม 100 บาท = +2)`;
+    }
 }
