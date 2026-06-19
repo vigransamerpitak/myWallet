@@ -29,6 +29,29 @@ function updateEmergencyTarget(val) {
     calculateEmergencyProgress();
 }
 
+function initEmergencyTargetTitle() {
+    const input = document.getElementById('emergencyTargetTitleInput');
+    if (!input) return;
+    const saved = localStorage.getItem('emergencyTargetTitle') || 'ความคืบหน้าเงินออมฉุกเฉิน';
+    input.value = saved;
+}
+
+function updateEmergencyTargetTitle(val) {
+    let clean = val.trim();
+    if (!clean) clean = "ความคืบหน้าเงินออมฉุกเฉิน";
+    localStorage.setItem('emergencyTargetTitle', clean);
+    const input = document.getElementById('emergencyTargetTitleInput');
+    if (input) input.value = clean;
+}
+
+function getGoalIcon(type) {
+    if (type === 'save') return '🎯';
+    if (type === 'save_travel') return '✈️';
+    if (type === 'save_shopping') return '🛍️';
+    if (type === 'save_gift') return '🎁';
+    return '📄';
+}
+
 function calculateEmergencyProgress() {
     const totalEl = document.getElementById('emergencyTotal');
     if (!totalEl) return;
@@ -253,6 +276,21 @@ function initAutoSaveSettings() {
         e.target.value = val;
         localStorage.setItem('autoSavePercent', val);
     });
+
+    // จัดการแสดง/ซ่อนฟิลด์วัตถุประสงค์การออม
+    const txOwner = document.getElementById('txOwner');
+    if (txOwner) {
+        txOwner.addEventListener('change', (e) => {
+            const purposeArea = document.getElementById('emergencyPurposeArea');
+            if (purposeArea) {
+                if (e.target.value === 'emergency') {
+                    purposeArea.classList.remove('d-none');
+                } else {
+                    purposeArea.classList.add('d-none');
+                }
+            }
+        });
+    }
 }
 
 function toggleAutoSaveUI() {
@@ -284,6 +322,9 @@ window.onload = function () {
 
             // โหลดตั้งค่าระบบหักออมอัตโนมัติ
             initAutoSaveSettings();
+
+            // โหลดตั้งค่าหัวข้อเป้าหมายออมฉุกเฉิน
+            initEmergencyTargetTitle();
 
             // โหลดหมวดหมู่ และ โหลดตารางรายการเงินไปพร้อมๆ กัน ไม่ต้องรอคิว
             await Promise.all([loadCategories(), updateFilters()]);
@@ -729,6 +770,15 @@ async function saveTransaction(categoryName, type) {
     let dbOwner = ownerInput.value;
     let finalNote = noteInput.value.trim();
 
+    // 🎯 ดึงและแนบวัตถุประสงค์การออมย่อยในโน้ต (เฉพาะเมื่อเป็นกระเป๋าเงินออมฉุกเฉิน)
+    const savingPurposeInput = document.getElementById('txSavingPurpose');
+    if (dbOwner === 'emergency' && savingPurposeInput) {
+        const purposeVal = savingPurposeInput.value.trim();
+        if (purposeVal) {
+            finalNote = finalNote ? `[ออมเพื่อ: ${purposeVal}] ${finalNote}` : `[ออมเพื่อ: ${purposeVal}]`;
+        }
+    }
+
     let finalCategory = categoryName;
     if (finalNote.includes('[SLIP_URL:')) {
         finalCategory = "สลิปรอระบุหมวดหมู่";
@@ -745,6 +795,10 @@ async function saveTransaction(categoryName, type) {
         showToast(`บันทึกไม่สำเร็จ: ${error.message}`, '❌', true);
     } else {
         amountInput.value = ''; noteInput.value = ''; if (slipInput) slipInput.value = '';
+        if (savingPurposeInput) {
+            savingPurposeInput.value = '';
+            document.getElementById('emergencyPurposeArea').classList.add('d-none');
+        }
         if (previewArea) previewArea.classList.add('d-none');
         ownerInput.value = currentUserRole === 'me' ? 'me' : 'partner';
         showToast('จดบันทึกเรียบร้อยแล้วจ้า! 💰', '✅');
@@ -805,6 +859,21 @@ function enterEditMode(id, amount, note, originalOwner) {
     let displayOwner = originalOwner;
     let displayNote = note || '';
 
+    // 🎯 แยกแยะวัตถุประสงค์การออมย่อย
+    let displaySavingPurpose = '';
+    if (originalOwner === 'emergency') {
+        const matchPurpose = displayNote.match(/\[ออมเพื่อ:\s*(.*?)\]/);
+        if (matchPurpose && matchPurpose[1]) {
+            displaySavingPurpose = matchPurpose[1];
+            displayNote = displayNote.replace(/\[ออมเพื่อ:\s*.*?\]\s*/, '');
+        }
+        document.getElementById('emergencyPurposeArea').classList.remove('d-none');
+    } else {
+        document.getElementById('emergencyPurposeArea').classList.add('d-none');
+    }
+    const savingPurposeInput = document.getElementById('txSavingPurpose');
+    if (savingPurposeInput) savingPurposeInput.value = displaySavingPurpose;
+
     if (originalOwner === 'shared') {
         if (displayNote.startsWith('[จ่ายโดย: me]')) { displayOwner = 'shared-me'; displayNote = displayNote.replace('[จ่ายโดย: me] ', '').replace('[จ่ายโดย: me]', ''); }
         else if (displayNote.startsWith('[จ่ายโดย: partner]')) { displayOwner = 'shared-partner'; displayNote = displayNote.replace('[จ่ายโดย: partner] ', '').replace('[จ่ายโดย: partner]', ''); }
@@ -843,6 +912,11 @@ function enterEditMode(id, amount, note, originalOwner) {
 
 function cancelEditMode() {
     document.getElementById('editTxId').value = ''; document.getElementById('txAmount').value = ''; document.getElementById('txNote').value = '';
+    const savingPurposeInput = document.getElementById('txSavingPurpose');
+    if (savingPurposeInput) {
+        savingPurposeInput.value = '';
+        document.getElementById('emergencyPurposeArea').classList.add('d-none');
+    }
     document.getElementById('txOwner').value = currentUserRole === 'me' ? 'me' : 'partner';
     const existingSlipArea = document.getElementById('existingSlipArea'); if (existingSlipArea) existingSlipArea.remove();
     const recordBox = document.getElementById('recordBox'); recordBox.style.backgroundColor = '#ffffff'; recordBox.style.borderColor = 'transparent';
@@ -874,6 +948,15 @@ async function submitEditTransaction() {
 
     let dbOwner = owner;
     let finalNote = note;
+
+    // 🎯 ดึงและแนบวัตถุประสงค์การออมย่อยในโน้ต (เฉพาะเมื่อเป็นกระเป๋าเงินออมฉุกเฉิน)
+    const savingPurposeInput = document.getElementById('txSavingPurpose');
+    if (dbOwner === 'emergency' && savingPurposeInput) {
+        const purposeVal = savingPurposeInput.value.trim();
+        if (purposeVal) {
+            finalNote = finalNote ? `[ออมเพื่อ: ${purposeVal}] ${finalNote}` : `[ออมเพื่อ: ${purposeVal}]`;
+        }
+    }
 
     if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: me] ${finalNote}` : `[จ่ายโดย: me]`; }
     else if (dbOwner === 'shared-partner') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: partner] ${finalNote}` : `[จ่ายโดย: partner]`; }
@@ -958,7 +1041,7 @@ async function loadGoals() {
         if (goal.is_completed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-success">✅ สำเร็จ</span><button onclick="resetGoalStatus(${goal.id}, '${safeTitle}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
         else if (goal.is_failed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-secondary text-dark">❌ ข้าม</span><button onclick="resetGoalStatus(${goal.id}, '${safeTitle}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
         else { actionUI = `<div class="btn-group btn-group-sm" style="border-radius:8px; overflow:hidden;"><button onclick="settleGoal(${goal.id}, 'success', '${safeTitle}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-success py-0.5 px-2 cursor-pointer">✅ ออมแล้ว</button><button onclick="settleGoal(${goal.id}, 'failed', '${safeTitle}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-danger py-0.5 px-2 cursor-pointer">❌ ข้าม</button><button onclick="deleteGoalFrontend(${goal.id})" class="btn btn-link text-muted p-0 px-1 ms-1 text-xs cursor-pointer" title="ลบถาวร">🗑️</button></div>`; }
-        div.innerHTML = `<div class="text-truncate me-2"><span class="${goal.is_completed ? 'text-decoration-line-through text-muted' : goal.is_failed ? 'text-decoration-line-through text-black-50 font-normal' : 'fw-semibold text-dark'}">${goal.type === 'save' ? '🎯' : '📄'} ${goal.title}</span></div><div class="d-flex align-items-center gap-2 shrink-0"><span class="fw-bold text-dark">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>${actionUI}</div>`;
+        div.innerHTML = `<div class="text-truncate me-2"><span class="${goal.is_completed ? 'text-decoration-line-through text-muted' : goal.is_failed ? 'text-decoration-line-through text-black-50 font-normal' : 'fw-semibold text-dark'}">${getGoalIcon(goal.type)} ${goal.title}</span></div><div class="d-flex align-items-center gap-2 shrink-0"><span class="fw-bold text-dark">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>${actionUI}</div>`;
         goalsList.appendChild(div);
     });
     loadedGoalsCache = goals || [];
@@ -971,7 +1054,14 @@ async function settleGoal(id, status, title, amount, type) {
         const { error } = await supabaseClient.from('goals').update({ is_completed: true, is_failed: false }).eq('id', id);
         if (error) return showToast(error.message, '❌', true);
         const finalAmount = parseFloat(parseFloat(amount).toFixed(2));
-        if (type === 'save') { await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]); showToast('ย้ายเงินเข้าบัญชีฉุกเฉินแล้ว 🎯', '🎉'); }
+        if (type.startsWith('save')) { 
+            let emoji = '🎯';
+            if (type === 'save_travel') emoji = '✈️';
+            else if (type === 'save_shopping') emoji = '🛍️';
+            else if (type === 'save_gift') emoji = '🎁';
+            await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]); 
+            showToast(`ย้ายเงินเข้าบัญชีออมสำเร็จ ${emoji}`, '🎉'); 
+        }
         else { let noteWithTag = `[จ่ายโดย: ${currentUserRole === 'me' ? 'me' : 'partner'}] จ่ายบิลออโต้: ${title}`; await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: noteWithTag }]); showToast('ตัดยอดบิลส่วนกลางเรียบร้อย 📄', '✅'); }
         triggerCelebration();
     } else {
