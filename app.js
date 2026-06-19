@@ -1,9 +1,15 @@
-// app.js - Version 2.0 (AI Slip Scanner & Auto-Purge Storage)
+// app.js - Version 4.0 (Pagination, Export CSV, Monthly Trend Chart)
 
 let filterOwner = 'all';
 let filterType = 'all';
 let filterDate = 'this-month';
 let currentUserRole = 'me';
+let isSaving = false; // 🔒 ป้องกันกดซ้ำ (Loading State)
+
+// ✨ [ข้อ 6] Pagination State
+let currentPage = 1;
+const ROWS_PER_PAGE = 20;
+let filteredTxsCache = []; // เก็บข้อมูลหลัง filter เพื่อใช้กับ pagination + export
 
 function initUserIdentity(userId) {
     const userDisplay = document.getElementById('userDisplay');
@@ -60,7 +66,171 @@ function compressImage(file) {
     });
 }
 
-// app.js (ท่อนดักจับสแกนสลิปเวอร์ชันดึงคีย์ออโต้จาก Supabase)
+// ✨ [ข้อ 4] Helper: ล็อก/ปลดล็อกปุ่มหมวดหมู่ทั้งหมด ป้องกันกดซ้ำ
+function setAllCategoryButtonsLoading(loading) {
+    isSaving = loading;
+    const allBtns = document.querySelectorAll('.category-btn');
+    allBtns.forEach(btn => {
+        btn.disabled = loading;
+        if (loading) {
+            btn.style.opacity = '0.6';
+            btn.style.pointerEvents = 'none';
+        } else {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        }
+    });
+}
+
+// ✨ [ข้อ 5] ฟังก์ชันยืนยันสแกนสลิป — เรียกจากปุ่ม "ยืนยันสแกน" ใน Preview
+async function confirmSlipScan() {
+    const previewArea = document.getElementById('slipPreviewArea');
+    const statusEl = document.getElementById('slipLoadingStatus');
+    const slipInput = document.getElementById('slipInput');
+    const file = slipInput.files[0];
+    if (!file) return;
+
+    // ซ่อน preview แสดง loading
+    previewArea.classList.add('d-none');
+    statusEl.classList.remove('d-none');
+
+    try {
+        // 🔄 1. ดึงคีย์ลับจาก Supabase มาใช้งานแบบ Real-time
+        const { data: secretData, error: secretError } = await supabaseClient
+            .from('system_secrets')
+            .select('key_value')
+            .eq('key_name', 'GEMINI_API_KEY')
+            .single();
+
+        if (secretError || !secretData) {
+            throw new Error("ระบบหา API Key ในฐานข้อมูลไม่เจอ กรุณาเช็คตาราง system_secrets ครับ");
+        }
+
+        const liveGeminiKey = secretData.key_value;
+
+        // 2. บีบอัดรูปภาพ
+        const compressedFile = await compressImage(file);
+
+        // 3. อัปโหลดเข้าถังพักชั่วคราว Supabase Storage
+        const fileExt = compressedFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabaseClient
+            .storage
+            .from('slips')
+            .upload(fileName, compressedFile);
+
+        if (uploadError) throw uploadError;
+
+        // 4. แปลงภาพสลิปเป็น Base64
+        const base64Data = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(compressedFile);
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        });
+
+        // 5. ส่งให้ Gemini ทำงาน — ✨ [ข้อ 3] Prompt ใหม่แกะข้อมูลเพิ่ม
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${liveGeminiKey}`;
+        const promptPayload = {
+            contents: [{
+                parts: [
+                    { text: `นี่คือรูปสลิปโอนเงินของธนาคารในไทย ให้แกะข้อมูลต่อไปนี้จากสลิป:
+1. "amount" — ยอดเงินสุทธิที่โอนสำเร็จ (Total/Amount) เป็นตัวเลขทศนิยม เช่น 150.00
+2. "date" — วันที่ทำรายการในรูปแบบ YYYY-MM-DD (เช่น 2026-06-19) ถ้าไม่มีให้ใส่ null
+3. "receiver" — ชื่อผู้รับเงินหรือชื่อร้านค้า/บัญชีปลายทาง ถ้าไม่มีให้ใส่ null
+4. "bank" — ชื่อธนาคาร/ช่องทางที่โอน (เช่น กสิกร, SCB, PromptPay) ถ้าไม่มีให้ใส่ null
+5. "category_suggestion" — เดาหมวดหมู่รายจ่ายที่น่าจะเป็นไปได้มากที่สุด 1 ชื่อ เช่น "อาหาร", "ค่าเช่า", "ช้อปปิ้ง", "ค่าน้ำค่าไฟ" ถ้าเดาไม่ได้ให้ใส่ null
+
+ตอบกลับเฉพาะ JSON เท่านั้น ตัวอย่าง:
+{"amount": 150.00, "date": "2026-06-19", "receiver": "นาย ก", "bank": "กสิกร", "category_suggestion": "อาหาร"}` },
+                    { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+                ]
+            }],
+            generationConfig: {
+                responseMimeType: "application/json"
+            }
+        };
+
+        // 🔄 Retry logic: ถ้าโดน rate limit (429) จะรอแล้วลองใหม่อัตโนมัติ สูงสุด 3 ครั้ง
+        let resData = null;
+        const MAX_RETRIES = 3;
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            const response = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(promptPayload) });
+            resData = await response.json();
+
+            if (response.status === 429 && attempt < MAX_RETRIES) {
+                let waitSec = 30;
+                const retryMatch = JSON.stringify(resData).match(/retry in ([\d.]+)s/i);
+                if (retryMatch) waitSec = Math.ceil(parseFloat(retryMatch[1]));
+
+                showToast(`⏳ API เกินโควต้าชั่วคราว รอ ${waitSec} วินาทีแล้วลองใหม่ครั้งที่ ${attempt + 1}...`, '🔄');
+                await new Promise(r => setTimeout(r, waitSec * 1000));
+                continue;
+            }
+            break;
+        }
+
+        if (!resData.candidates || resData.candidates.length === 0) {
+            throw new Error(resData.error?.message || "Google Gemini ปฏิเสธการแกะโครงสร้างสลิปใบนี้");
+        }
+
+        const aiText = resData.candidates[0].content.parts[0].text.trim();
+        const result = JSON.parse(aiText);
+
+        // 6. ✨ [ข้อ 3] ใส่ข้อมูลเข้าฟอร์มออโต้ (แกะข้อมูลเพิ่มจาก AI)
+        document.getElementById('txAmount').value = parseFloat(result.amount).toFixed(2);
+
+        // สร้างโน้ตอัจฉริยะจากข้อมูลที่ AI แกะได้
+        let smartNote = `[SLIP_URL:${fileName}]`;
+        const infoParts = [];
+        if (result.receiver) infoParts.push(`ผู้รับ: ${result.receiver}`);
+        if (result.bank) infoParts.push(`ผ่าน: ${result.bank}`);
+        if (result.date) infoParts.push(`วันที่: ${result.date}`);
+        if (infoParts.length > 0) {
+            smartNote += ` ${infoParts.join(' | ')}`;
+        } else {
+            smartNote += ' รอคุณระบุชื่อรายการจริง';
+        }
+        document.getElementById('txNote').value = smartNote;
+
+        // แสดงผลลัพธ์ AI ให้ผู้ใช้เห็นใน Preview Area
+        let aiResultHTML = `<div class="mt-2 p-2 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25">
+            <p class="small fw-bold text-success mb-1">🤖 AI แกะข้อมูลสำเร็จ:</p>
+            <ul class="list-unstyled small mb-0 text-dark">
+                <li>💰 ยอดเงิน: <b>${parseFloat(result.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</b></li>`;
+        if (result.receiver) aiResultHTML += `<li>👤 ผู้รับ: <b>${result.receiver}</b></li>`;
+        if (result.bank) aiResultHTML += `<li>🏦 ธนาคาร: <b>${result.bank}</b></li>`;
+        if (result.date) aiResultHTML += `<li>📅 วันที่: <b>${result.date}</b></li>`;
+        if (result.category_suggestion) aiResultHTML += `<li>🏷️ หมวดหมู่ที่แนะนำ: <b>${result.category_suggestion}</b></li>`;
+        aiResultHTML += `</ul></div>`;
+
+        previewArea.innerHTML = `
+            <div class="text-center">
+                <span class="text-success small fw-bold">✅ สแกนเรียบร้อย กรุณาเลือกกระเป๋าเงินและหมวดหมู่เพื่อบันทึก</span>
+                ${aiResultHTML}
+            </div>`;
+        previewArea.classList.remove('d-none');
+
+        showToast('AI แกะข้อมูลจากสลิปเรียบร้อยแล้วจ้า! กรุณากดเลือกกระเป๋าเงินและปุ่มหมวดหมู่เพื่อบันทึกต่อได้เลย', '🤖');
+
+    } catch (err) {
+        console.error(err);
+        showToast(`ระบบสแกนสลิปขัดข้อง: ${err.message}`, '⚠️', true);
+        previewArea.classList.add('d-none');
+    } finally {
+        statusEl.classList.add('d-none');
+    }
+}
+
+// ✨ [ข้อ 5] ยกเลิก Preview สลิป
+function cancelSlipPreview() {
+    const slipInput = document.getElementById('slipInput');
+    const previewArea = document.getElementById('slipPreviewArea');
+    slipInput.value = '';
+    previewArea.classList.add('d-none');
+}
+
+// ✨ [ข้อ 5] ดักจับสลิปเวอร์ชันใหม่ — แสดง Preview ก่อนส่ง AI
 function setupSlipScannerListener() {
     const slipInput = document.getElementById('slipInput');
     if (!slipInput) return;
@@ -69,97 +239,26 @@ function setupSlipScannerListener() {
         const file = e.target.files[0];
         if (!file) return;
 
-        const statusEl = document.getElementById('slipLoadingStatus');
-        statusEl.classList.remove('d-none');
-
-        try {
-            // 🔄 1. ดึงคีย์ลับจาก Supabase มาใช้งานแบบ Real-time (หน้าบ้านไม่ต้องกรอกเอง)
-            const { data: secretData, error: secretError } = await supabaseClient
-                .from('system_secrets')
-                .select('key_value')
-                .eq('key_name', 'GEMINI_API_KEY')
-                .single();
-
-            if (secretError || !secretData) {
-                throw new Error("ระบบหา API Key ในฐานข้อมูลไม่เจอ กรุณาเช็คตาราง system_secrets ครับ");
-            }
-
-            const liveGeminiKey = secretData.key_value;
-
-            // 2. บีบอัดรูปภาพ
-            const compressedFile = await compressImage(file);
-
-            // 3. อัปโหลดเข้าถังพักชั่วคราว Supabase Storage
-            const fileExt = compressedFile.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-            const { data: uploadData, error: uploadError } = await supabaseClient
-                .storage
-                .from('slips')
-                .upload(fileName, compressedFile);
-
-            if (uploadError) throw uploadError;
-
-            // 4. แปลงภาพสลิปเป็น Base64
-            const base64Data = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(compressedFile);
-                reader.onloadend = () => resolve(reader.result.split(',')[1]);
-            });
-
-            // 5. ส่งให้ Gemini ทำงานโดยใช้คีย์ที่เราดึงมาจาก Supabase เมื่อกี้
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${liveGeminiKey}`;
-            const promptPayload = {
-                contents: [{
-                    parts: [
-                        { text: "นี่คือรูปสลิปโอนเงินของธนาคารในไทย ให้แกะข้อมูลยอดเงินสุทธิที่โอนสำเร็จ (Total/Amount) ออกมาเป็นตัวเลขทศนิยมเท่านั้น เช่น 150.00 หรือ 2500.50 ห้ามมีตัวอักษรอื่นปน ตอบกลับเฉพาะโครงสร้าง JSON รูปแบบนี้เท่านั้น: {\"amount\": 150.00}" },
-                        { inlineData: { mimeType: "image/jpeg", data: base64Data } }
-                    ]
-                }],
-                generationConfig: {
-                    responseMimeType: "application/json"
-                }
-            };
-
-            // 🔄 Retry logic: ถ้าโดน rate limit (429) จะรอแล้วลองใหม่อัตโนมัติ สูงสุด 3 ครั้ง
-            let resData = null;
-            const MAX_RETRIES = 3;
-            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                const response = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(promptPayload) });
-                resData = await response.json();
-
-                if (response.status === 429 && attempt < MAX_RETRIES) {
-                    // ดึงเวลารอจาก error message หรือใช้ default 30 วินาที
-                    let waitSec = 30;
-                    const retryMatch = JSON.stringify(resData).match(/retry in ([\d.]+)s/i);
-                    if (retryMatch) waitSec = Math.ceil(parseFloat(retryMatch[1]));
-
-                    showToast(`⏳ API เกินโควต้าชั่วคราว รอ ${waitSec} วินาทีแล้วลองใหม่ครั้งที่ ${attempt + 1}...`, '🔄');
-                    await new Promise(r => setTimeout(r, waitSec * 1000));
-                    continue;
-                }
-                break; // สำเร็จหรือ error อื่นที่ไม่ใช่ 429
-            }
-
-            if (!resData.candidates || resData.candidates.length === 0) {
-                throw new Error(resData.error?.message || "Google Gemini ปฏิเสธการแกะโครงสร้างสลิปใบนี้");
-            }
-
-            const aiText = resData.candidates[0].content.parts[0].text.trim();
-            const result = JSON.parse(aiText);
-
-            // 6. ใส่ยอดเงินเข้าฟอร์มออโต้
-            document.getElementById('txAmount').value = parseFloat(result.amount).toFixed(2);
-            document.getElementById('txNote').value = `[SLIP_URL:${fileName}] รอคุณระบุชื่อรายการจริง`;
-
-            showToast('AI แกะยอดเงินจากสลิปเรียบร้อยแล้วจ้า! กรุณากดเลือกกระเป๋าเงินและปุ่มหมวดหมู่เพื่อบันทึกต่อได้เลย', '🤖');
-
-        } catch (err) {
-            console.error(err);
-            showToast(`ระบบสแกนสลิปขัดข้อง: ${err.message}`, '⚠️', true);
-        } finally {
-            statusEl.classList.add('d-none');
-        }
+        // แสดง Preview รูปสลิปก่อนส่ง AI
+        const previewArea = document.getElementById('slipPreviewArea');
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            previewArea.innerHTML = `
+                <div class="text-center">
+                    <p class="small fw-bold text-secondary mb-2">🖼️ ตรวจสอบรูปสลิปก่อนส่ง AI สแกน</p>
+                    <img src="${event.target.result}" class="img-fluid rounded-3 border mb-2" style="max-height: 250px; object-fit: contain;" alt="Slip Preview">
+                    <div class="d-flex justify-content-center gap-2 mt-2">
+                        <button onclick="confirmSlipScan()" class="btn btn-success btn-sm fw-bold px-3 rounded-3">
+                            <i class="bi bi-robot me-1"></i> ✅ ยืนยันส่งสแกน
+                        </button>
+                        <button onclick="cancelSlipPreview()" class="btn btn-outline-secondary btn-sm fw-bold px-3 rounded-3">
+                            ❌ ยกเลิก
+                        </button>
+                    </div>
+                </div>`;
+            previewArea.classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
     });
 }
 
@@ -206,16 +305,23 @@ async function loadCategories() {
     });
 }
 
+// ✨ [ข้อ 4] saveTransaction พร้อม Loading State
 async function saveTransaction(categoryName, type) {
+    if (isSaving) return; // ป้องกันกดซ้ำ
+
     const amountInput = document.getElementById('txAmount');
     const noteInput = document.getElementById('txNote');
     const ownerInput = document.getElementById('txOwner');
     const slipInput = document.getElementById('slipInput');
+    const previewArea = document.getElementById('slipPreviewArea');
 
     if (!ownerInput.value) return showToast('กรุณาเลือกกระเป๋าเงินด้วยครับ', '⚠️', true);
     const amount = parseFloat(amountInput.value);
     if (isNaN(amount) || amount <= 0) return showToast('กรุณากรอกจำนวนเงินให้ถูกต้องก่อนเลือกหมวดหมู่', '🔢', true);
     const finalAmount = parseFloat(amount.toFixed(2));
+
+    // 🔒 ล็อกปุ่มทั้งหมด
+    setAllCategoryButtonsLoading(true);
 
     let dbOwner = ownerInput.value;
     let finalNote = noteInput.value.trim();
@@ -236,10 +342,20 @@ async function saveTransaction(categoryName, type) {
         showToast(`บันทึกไม่สำเร็จ: ${error.message}`, '❌', true);
     } else {
         amountInput.value = ''; noteInput.value = ''; if (slipInput) slipInput.value = '';
+        if (previewArea) previewArea.classList.add('d-none');
         ownerInput.value = currentUserRole === 'me' ? 'me' : 'partner';
         showToast('จดบันทึกเรียบร้อยแล้วจ้า! 💰', '✅');
         await loadTransactions();
     }
+
+    // 🔓 ปลดล็อกปุ่มทั้งหมด
+    setAllCategoryButtonsLoading(false);
+}
+
+// ✨ [ข้อ 2] XSS Fix: ใช้ escapeForAttr() ป้องกันตัวอักษรพิเศษใน onclick attribute
+function escapeForAttr(str) {
+    if (!str) return '';
+    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function enterEditMode(id, amount, note, originalOwner) {
@@ -294,14 +410,18 @@ function cancelEditMode() {
     document.getElementById('categoryActionArea').classList.remove('d-none'); document.getElementById('editActionArea').classList.add('d-none');
 }
 
+// ✨ [ข้อ 4] submitEditTransaction พร้อม Loading State
 async function submitEditTransaction() {
+    const editBtn = document.querySelector('#editActionArea .btn-warning');
+    if (editBtn) { editBtn.disabled = true; editBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังบันทึก...'; }
+
     const id = document.getElementById('editTxId').value;
     const amount = parseFloat(document.getElementById('txAmount').value);
     const note = document.getElementById('txNote').value.trim();
     const owner = document.getElementById('txOwner').value;
 
-    if (!owner) return showToast('กรุณาเลือกกระเป๋าเงินด้วยครับ', '⚠️', true);
-    if (isNaN(amount) || amount <= 0) return showToast('กรุณากรอกยอดเงินให้ถูกต้อง', '🔢', true);
+    if (!owner) { if (editBtn) { editBtn.disabled = false; editBtn.innerHTML = '💾 บันทึกการแก้ไข'; } return showToast('กรุณาเลือกกระเป๋าเงินด้วยครับ', '⚠️', true); }
+    if (isNaN(amount) || amount <= 0) { if (editBtn) { editBtn.disabled = false; editBtn.innerHTML = '💾 บันทึกการแก้ไข'; } return showToast('กรุณากรอกยอดเงินให้ถูกต้อง', '🔢', true); }
     const finalAmount = parseFloat(amount.toFixed(2));
 
     // ดึงข้อมูลเดิมมาเช็คว่ามีสลิปผูกอยู่ไหม เพื่อเตรียมลบรูปคืนพื้นที่คลาวด์
@@ -318,13 +438,12 @@ async function submitEditTransaction() {
     if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: me] ${finalNote}` : `[จ่ายโดย: me]`; }
     else if (dbOwner === 'shared-partner') { dbOwner = 'shared'; finalNote = finalNote ? `[จ่ายโดย: partner] ${finalNote}` : `[จ่ายโดย: partner]`; }
 
-    // 💡 [ลอจิกที่แก้ไขให้ถูกต้อง] ดึงหมวดหมู่ตามชื่อปุ่มล่าสุดที่คุณเดฟเลือก ถ้าอยู่ในโหมดแก้ไขให้รักษาสิทธิ์ตามจริง
+    // 💡 ดึงหมวดหมู่ตามจริง
     let finalCategory = currentTx ? currentTx.category_name : 'ทั่วไป';
     if (finalCategory === "สลิปรอระบุหมวดหมู่" && !finalNote.includes('[SLIP_URL:')) {
-        finalCategory = "ทั่วไป"; // ปลดป้ายเหลืองออกเมื่อแอดมินเขียนโน้ตกำกับแล้ว แต่ยังไม่ได้ระบุหมวดหมู่เฉพาะ
+        finalCategory = "ทั่วไป";
     }
 
-    // สั่งอัปเดตลงฐานข้อมูล Supabase เพียง "ครั้งเดียว" ป้องกันการเขียนทับซ้อน
     const { error: updateError } = await supabaseClient
         .from('transactions')
         .update({ amount: finalAmount, note: finalNote || null, owner: dbOwner, category_name: finalCategory })
@@ -333,7 +452,7 @@ async function submitEditTransaction() {
     if (updateError) {
         showToast(`แก้ไขล้มเหลว: ${updateError.message}`, '❌', true);
     } else {
-        // 🔥 ถ้าเปลี่ยนชื่อโน้ตจริงและลบแท็กสลิปออกแล้ว สั่งทำลายรูปภาพใน Storage ทันทีเพื่อคืนพื้นที่ 500MB!
+        // 🔥 ถ้าลบแท็กสลิปออกแล้ว สั่งทำลายรูปภาพใน Storage ทันที
         if (fileToDelete && !finalNote.includes('[SLIP_URL:')) {
             await supabaseClient.storage.from('slips').remove([fileToDelete]);
             console.log(`[Storage Purged] ลบไฟล์รูปสลิป ${fileToDelete} ออกเพื่อคืนพื้นที่ Storage เรียบร้อย`);
@@ -343,10 +462,16 @@ async function submitEditTransaction() {
         showToast('อัปเดตข้อมูลและลบรูปภาพสลิปคืนพื้นที่เรียบร้อยแล้วจ้า!', '💾');
         await loadTransactions();
     }
+
+    if (editBtn) { editBtn.disabled = false; editBtn.innerHTML = '💾 บันทึกการแก้ไข'; }
 }
 
 async function deleteTransaction(id) {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบประวัติรายการเงินแถวนี้ทิ้งอย่างถาวร?')) return;
+
+    // ✨ [ข้อ 4] ล็อกปุ่มลบที่กด
+    const deleteBtn = document.querySelector(`[data-delete-id="${id}"]`);
+    if (deleteBtn) { deleteBtn.disabled = true; deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
 
     const { data: currentTx } = await supabaseClient.from('transactions').select('note').eq('id', id).single();
     if (currentTx && currentTx.note && currentTx.note.includes('[SLIP_URL:')) {
@@ -386,11 +511,12 @@ async function loadGoals() {
     const goalsList = document.getElementById('goalsList'); goalsList.innerHTML = '';
     if (!goals || goals.length === 0) { goalsList.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">ไม่มีภารกิจการเงินระบุไว้</p>'; return; }
     goals.forEach(goal => {
+        const safeTitle = escapeForAttr(goal.title);
         const div = document.createElement('div'); div.className = "list-group-item d-flex justify-content-between align-items-center p-2 mb-1 bg-light rounded-3 border-0 text-sm shadow-2xs";
         let actionUI = '';
-        if (goal.is_completed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-success">✅ สำเร็จ</span><button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
-        else if (goal.is_failed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-secondary text-dark">❌ ข้าม</span><button onclick="resetGoalStatus(${goal.id}, '${goal.title}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
-        else { actionUI = `<div class="btn-group btn-group-sm" style="border-radius:8px; overflow:hidden;"><button onclick="settleGoal(${goal.id}, 'success', '${goal.title}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-success py-0.5 px-2 cursor-pointer">✅ ออมแล้ว</button><button onclick="settleGoal(${goal.id}, 'failed', '${goal.title}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-danger py-0.5 px-2 cursor-pointer">❌ ข้าม</button><button onclick="deleteGoalFrontend(${goal.id})" class="btn btn-link text-muted p-0 px-1 ms-1 text-xs cursor-pointer" title="ลบถาวร">🗑️</button></div>`; }
+        if (goal.is_completed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-success">✅ สำเร็จ</span><button onclick="resetGoalStatus(${goal.id}, '${safeTitle}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
+        else if (goal.is_failed) { actionUI = `<div class="d-flex align-items-center gap-2"><span class="badge bg-secondary text-dark">❌ ข้าม</span><button onclick="resetGoalStatus(${goal.id}, '${safeTitle}')" class="btn btn-outline-secondary btn-sm py-0 px-1 text-xs cursor-pointer" style="border-radius:6px;">↩️ รีเซ็ต</button></div>`; }
+        else { actionUI = `<div class="btn-group btn-group-sm" style="border-radius:8px; overflow:hidden;"><button onclick="settleGoal(${goal.id}, 'success', '${safeTitle}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-success py-0.5 px-2 cursor-pointer">✅ ออมแล้ว</button><button onclick="settleGoal(${goal.id}, 'failed', '${safeTitle}', ${goal.amount}, '${goal.type}')" class="btn btn-outline-danger py-0.5 px-2 cursor-pointer">❌ ข้าม</button><button onclick="deleteGoalFrontend(${goal.id})" class="btn btn-link text-muted p-0 px-1 ms-1 text-xs cursor-pointer" title="ลบถาวร">🗑️</button></div>`; }
         div.innerHTML = `<div class="text-truncate me-2"><span class="${goal.is_completed ? 'text-decoration-line-through text-muted' : goal.is_failed ? 'text-decoration-line-through text-black-50 font-normal' : 'fw-semibold text-dark'}">${goal.type === 'save' ? '🎯' : '📄'} ${goal.title}</span></div><div class="d-flex align-items-center gap-2 shrink-0"><span class="fw-bold text-dark">${parseFloat(goal.amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</span>${actionUI}</div>`;
         goalsList.appendChild(div);
     });
@@ -430,6 +556,9 @@ async function loadTransactions() {
     let totalMePaidShared = 0; let totalPartnerPaidShared = 0;
     let categorySummary = {}; let totalExpenseFiltered = 0;
     const now = new Date(); const thisMonth = now.getMonth(); const thisYear = now.getFullYear();
+
+    // ✨ [ข้อ 6] เก็บ filtered rows สำหรับ pagination + export
+    filteredTxsCache = [];
 
     txs.forEach(tx => {
         const txDate = new Date(tx.created_at); const txAmount = parseFloat(tx.amount); const value = tx.type === 'income' ? txAmount : -txAmount;
@@ -471,6 +600,18 @@ async function loadTransactions() {
 
         if (!passOwnerFilter || !passTypeFilter || !isCurrentFilterMonth) return;
 
+        // เก็บเข้า cache สำหรับ pagination
+        filteredTxsCache.push({ tx, txDate, txAmount, exactOwner, cleanNote });
+    });
+
+    // ✨ [ข้อ 6] Pagination: แสดงเฉพาะหน้าปัจจุบัน
+    const totalPages = Math.max(1, Math.ceil(filteredTxsCache.length / ROWS_PER_PAGE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const startIdx = (currentPage - 1) * ROWS_PER_PAGE;
+    const endIdx = startIdx + ROWS_PER_PAGE;
+    const pageItems = filteredTxsCache.slice(startIdx, endIdx);
+
+    pageItems.forEach(({ tx, txDate, txAmount, exactOwner, cleanNote }) => {
         let ownerBadge = '';
         if (exactOwner === 'me') ownerBadge = '<span class="badge bg-primary-subtle text-primary">🙋‍♂️ ฉัน</span>';
         else if (exactOwner === 'partner') ownerBadge = '<span class="badge bg-danger-subtle text-danger">🙋‍♀️ แฟน</span>';
@@ -484,6 +625,9 @@ async function loadTransactions() {
             displayNoteText = displayNoteText.replace(/\[SLIP_URL:.*?\]/g, '').trim() || '📷 แนบไฟล์สลิป (คลิก ✏️ แก้ เพื่อลงหมวดหมู่จริง)';
         }
 
+        const safeNote = escapeForAttr(tx.note || '');
+        const safeOwner = escapeForAttr(tx.owner);
+
         const dateStr = txDate.toLocaleString('th-TH', { hour12: false });
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -496,12 +640,15 @@ async function loadTransactions() {
             <td class="fw-bold">${txAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</td>
             <td class="text-muted small">${displayNoteText || '-'}</td>
             <td class="text-center whitespace-nowrap">
-                <button onclick="enterEditMode(${tx.id}, ${txAmount}, '${tx.note || ''}', '${tx.owner}')" class="btn btn-outline-warning btn-sm py-0 px-2 cursor-pointer" style="border-radius:6px;">✏️ แก้</button>
-                <button onclick="deleteTransaction(${tx.id})" class="btn btn-outline-danger btn-sm py-0 px-2 cursor-pointer" style="border-radius:6px;">🗑️ ลบ</button>
+                <button onclick="enterEditMode(${tx.id}, ${txAmount}, '${safeNote}', '${safeOwner}')" class="btn btn-outline-warning btn-sm py-0 px-2 cursor-pointer" style="border-radius:6px;">✏️ แก้</button>
+                <button onclick="deleteTransaction(${tx.id})" data-delete-id="${tx.id}" class="btn btn-outline-danger btn-sm py-0 px-2 cursor-pointer" style="border-radius:6px;">🗑️ ลบ</button>
             </td>
         `;
         tbody.appendChild(row);
     });
+
+    // ✨ [ข้อ 6] Render Pagination Controls
+    renderPaginationControls(totalPages);
 
     document.getElementById('myTotal').innerText = `${myTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
     document.getElementById('partnerTotal').innerText = `${partnerTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
@@ -519,6 +666,155 @@ async function loadTransactions() {
         billTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• คุณควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | แฟนควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
     }
     renderAnalytics(categorySummary, totalExpenseFiltered);
+
+    // ✨ [ข้อ 8] สร้างกราฟแนวโน้มรายเดือนจากข้อมูลทั้งหมด
+    renderMonthlyTrend(txs);
+}
+
+// ✨ [ข้อ 6] Pagination Controls
+function renderPaginationControls(totalPages) {
+    const area = document.getElementById('paginationArea');
+    if (!area) return;
+    if (totalPages <= 1) { area.innerHTML = `<span class="text-muted small">ทั้งหมด ${filteredTxsCache.length} รายการ</span>`; return; }
+
+    let html = `<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">`;
+    html += `<span class="text-muted small">แสดง ${((currentPage - 1) * ROWS_PER_PAGE) + 1}-${Math.min(currentPage * ROWS_PER_PAGE, filteredTxsCache.length)} จาก ${filteredTxsCache.length} รายการ</span>`;
+    html += `<nav><ul class="pagination pagination-sm mb-0">`;
+
+    // ปุ่มก่อนหน้า
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">`;
+    html += `<a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">‹</a></li>`;
+
+    // เลขหน้า (แสดงสูงสุด 5 หน้ารอบหน้าปัจจุบัน)
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">`;
+        html += `<a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a></li>`;
+    }
+
+    // ปุ่มถัดไป
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">`;
+    html += `<a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">›</a></li>`;
+
+    html += `</ul></nav></div>`;
+    area.innerHTML = html;
+}
+
+function goToPage(page) {
+    currentPage = page;
+    loadTransactions();
+}
+
+// ✨ [ข้อ 7] Export CSV — ดาวน์โหลดรายงานตามตัวกรองปัจจุบัน
+function exportCSV() {
+    if (filteredTxsCache.length === 0) {
+        return showToast('ไม่มีข้อมูลให้ส่งออก กรุณาเปลี่ยนตัวกรองแล้วลองใหม่', '⚠️', true);
+    }
+
+    // BOM สำหรับ UTF-8 เพื่อให้ Excel เปิดภาษาไทยได้ถูกต้อง
+    const BOM = '\uFEFF';
+    const headers = ['วันที่', 'กระเป๋า', 'ประเภท', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึก'];
+    const rows = filteredTxsCache.map(({ tx, txDate, txAmount, exactOwner }) => {
+        const ownerMap = { 'me': 'ฉัน', 'partner': 'แฟน', 'shared': 'กองกลาง', 'shared-me': 'กองกลาง (ฉันจ่าย)', 'shared-partner': 'กองกลาง (แฟนจ่าย)', 'emergency': 'ออมฉุกเฉิน' };
+        const dateStr = txDate.toLocaleString('th-TH', { hour12: false });
+        let note = (tx.note || '').replace(/\[SLIP_URL:.*?\]/g, '').replace(/\[จ่ายโดย:.*?\]/g, '').trim();
+        // Escape double quotes in CSV
+        note = note.replace(/"/g, '""');
+        return [
+            `"${dateStr}"`,
+            `"${ownerMap[exactOwner] || exactOwner}"`,
+            `"${tx.type === 'expense' ? 'รายจ่าย' : 'รายรับ'}"`,
+            `"${tx.category_name}"`,
+            txAmount.toFixed(2),
+            `"${note}"`
+        ].join(',');
+    });
+
+    const csvContent = BOM + headers.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const now = new Date();
+    link.href = url;
+    link.download = `รายงานการเงิน_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast(`ส่งออก ${filteredTxsCache.length} รายการเป็นไฟล์ CSV เรียบร้อย!`, '📥');
+}
+
+// ✨ [ข้อ 8] กราฟแนวโน้มรายเดือน (6 เดือนย้อนหลัง)
+function renderMonthlyTrend(allTxs) {
+    const area = document.getElementById('monthlyTrendArea');
+    if (!area) return;
+
+    // คำนวณ 6 เดือนย้อนหลังรวมเดือนปัจจุบัน
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({ year: d.getFullYear(), month: d.getMonth(), label: `${d.toLocaleString('th-TH', { month: 'short' })} ${d.getFullYear() + 543}` });
+    }
+
+    // นับยอดรายรับ/รายจ่ายแต่ละเดือน
+    const monthlyData = months.map(m => ({ ...m, income: 0, expense: 0 }));
+    allTxs.forEach(tx => {
+        const txDate = new Date(tx.created_at);
+        const txAmount = parseFloat(tx.amount);
+        const idx = monthlyData.findIndex(m => m.year === txDate.getFullYear() && m.month === txDate.getMonth());
+        if (idx === -1) return;
+        if (tx.type === 'income') monthlyData[idx].income += txAmount;
+        else monthlyData[idx].expense += txAmount;
+    });
+
+    // หาค่า max สำหรับ scale แท่ง
+    const maxVal = Math.max(...monthlyData.map(m => Math.max(m.income, m.expense)), 1);
+
+    let html = `<div class="d-flex align-items-end justify-content-between gap-1" style="height: 180px; padding-bottom: 4px;">`;
+
+    monthlyData.forEach((m, i) => {
+        const incomeH = Math.max(2, (m.income / maxVal) * 150);
+        const expenseH = Math.max(2, (m.expense / maxVal) * 150);
+        const isCurrentMonth = (i === monthlyData.length - 1);
+
+        html += `<div class="d-flex flex-column align-items-center flex-fill" style="min-width: 0;">`;
+        // แท่งคู่ (รายรับ + รายจ่าย)
+        html += `<div class="d-flex align-items-end gap-1 mb-1" style="height: 155px;">`;
+        // แท่งรายรับ (เขียว)
+        html += `<div title="รายรับ: ${m.income.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บ." style="width: 14px; height: ${incomeH}px; background: linear-gradient(180deg, #34d399, #059669); border-radius: 4px 4px 0 0; transition: height 0.4s ease;"></div>`;
+        // แท่งรายจ่าย (แดง)
+        html += `<div title="รายจ่าย: ${m.expense.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บ." style="width: 14px; height: ${expenseH}px; background: linear-gradient(180deg, #f87171, #dc2626); border-radius: 4px 4px 0 0; transition: height 0.4s ease;"></div>`;
+        html += `</div>`;
+        // ชื่อเดือน
+        html += `<span class="text-center small ${isCurrentMonth ? 'fw-bold text-primary' : 'text-muted'}" style="font-size: 0.65rem; line-height: 1.1;">${m.label}</span>`;
+        html += `</div>`;
+    });
+
+    html += `</div>`;
+
+    // Legend + สรุปตัวเลข
+    const thisMonthData = monthlyData[monthlyData.length - 1];
+    const lastMonthData = monthlyData[monthlyData.length - 2];
+    let trendText = '';
+    if (lastMonthData && lastMonthData.expense > 0) {
+        const diff = thisMonthData.expense - lastMonthData.expense;
+        const pct = ((diff / lastMonthData.expense) * 100).toFixed(0);
+        if (diff > 0) trendText = `<span class="text-danger">📈 รายจ่ายเดือนนี้เพิ่มขึ้น ${Math.abs(pct)}% จากเดือนก่อน</span>`;
+        else if (diff < 0) trendText = `<span class="text-success">📉 รายจ่ายเดือนนี้ลดลง ${Math.abs(pct)}% จากเดือนก่อน</span>`;
+        else trendText = `<span class="text-muted">➡️ รายจ่ายเท่ากับเดือนก่อน</span>`;
+    }
+
+    html += `<div class="d-flex justify-content-between align-items-center mt-2 px-1">`;
+    html += `<div class="d-flex gap-3 small">`;
+    html += `<span><span style="display:inline-block;width:10px;height:10px;background:#059669;border-radius:2px;margin-right:4px;"></span>รายรับ</span>`;
+    html += `<span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:2px;margin-right:4px;"></span>รายจ่าย</span>`;
+    html += `</div>`;
+    if (trendText) html += `<span class="small fw-medium">${trendText}</span>`;
+    html += `</div>`;
+
+    area.innerHTML = html;
 }
 
 function renderAnalytics(summary, total) {
