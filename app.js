@@ -123,6 +123,8 @@ function calculateEmergencyProgress() {
 
 function calculateAIInsights(txs, totalMePaidShared, totalPartnerPaidShared, goals) {
     const contentEl = document.getElementById('aiInsightContent');
+    const bearEl = document.getElementById('bearMascot');
+    const bearBadgeEl = document.getElementById('bearBadge');
     if (!contentEl) return;
 
     const now = new Date();
@@ -154,37 +156,80 @@ function calculateAIInsights(txs, totalMePaidShared, totalPartnerPaidShared, goa
     }
 
     const insights = [];
+    let bearState = "🐻"; // Default
+    let bearBadge = "พี่หมี AI";
 
     // ข้อที่ 1: หมวดหมู่รายจ่ายยอดฮิต
+    let isWarningCategory = false;
     if (highestCatName && totalExp > 0) {
         const pct = ((highestCatAmt / totalExp) * 100).toFixed(0);
-        insights.push(`💡 เดือนนี้เราใช้จ่ายกับหมวด <b>${getCategoryEmoji(highestCatName)}</b> เยอะที่สุดนะ คิดเป็น <b>${pct}%</b> ของรายจ่ายรวม`);
+        const emoji = getCategoryEmoji(highestCatName);
+        if (pct >= 30) {
+            isWarningCategory = true;
+            insights.push(`💡 ว๊าย! เดือนนี้พวกเราช็อป/ใช้จ่ายกับหมวด <b>${emoji} ${highestCatName}</b> เยอะเป็นพิเศษถึง <b>${pct}%</b> ของกระเป๋ารวมเลยนะ (${highestCatAmt.toLocaleString('th-TH')} บ.) เพลาๆ กันหน่อยน้า 🐻💦`);
+        } else {
+            insights.push(`💡 เดือนนี้เราใช้จ่ายกับหมวด <b>${emoji} ${highestCatName}</b> เยอะที่สุดนะ คิดเป็น <b>${pct}%</b> ของรายจ่ายรวม`);
+        }
     } else {
-        insights.push(`💡 บันทึกรายจ่ายเพิ่มเติมเดือนนี้เพื่อให้ระบบเริ่มคำนวณและวิเคราะห์สถิตินะครับ`);
+        insights.push(`💡 บันทึกรายจ่ายเพิ่มเติมเดือนนี้เพื่อให้พี่หมีวิเคราะห์สถิตินะครับ`);
     }
 
     // ข้อที่ 2: บิลกองกลางสำรองจ่าย
+    const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+    const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
     if (totalMePaidShared > 0 || totalPartnerPaidShared > 0) {
         if (totalMePaidShared > totalPartnerPaidShared) {
             const diff = totalMePaidShared - (totalMePaidShared + totalPartnerPaidShared)/2;
-            insights.push(`🤝 เดือนนี้คุณโบ๊ทช่วยจ่ายเงินกองกลางล่วงหน้าไปมากกว่าคุณเอิร์น <b>${diff.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บ.</b>`);
+            insights.push(`🤝 เดือนนี้${nameMe}ช่วยจ่ายเงินกองกลางล่วงหน้าไปมากกว่า${namePartner} <b>${diff.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บ.</b> อย่าลืมโอนคืนกันน้า`);
         } else if (totalPartnerPaidShared > totalMePaidShared) {
             const diff = totalPartnerPaidShared - (totalMePaidShared + totalPartnerPaidShared)/2;
-            insights.push(`🤝 เดือนนี้คุณเอิร์นช่วยจ่ายเงินกองกลางล่วงหน้าไปมากกว่าคุณโบ๊ท <b>${diff.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บ.</b>`);
+            insights.push(`🤝 เดือนนี้${namePartner}ช่วยจ่ายเงินกองกลางล่วงหน้าไปมากกว่า${nameMe} <b>${diff.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บ.</b> อย่าลืมโอนคืนกันน้า`);
         } else {
-            insights.push(`🤝 ยอดหารบิลกองกลางส่วนกลางอยู่ในเกณฑ์เท่ากันเป๊ะพอดีเลยครับ`);
+            insights.push(`🤝 ยอดหารบิลกองกลางส่วนกลางแชร์กันลงตัวเท่ากันเป๊ะพอดีเลย น่ารักที่สุด!`);
         }
     }
 
     // ข้อที่ 3: เควสภารกิจ
+    let allGoalsDone = false;
     if (goals && goals.length > 0) {
         const completedCount = goals.filter(g => g.is_completed).length;
-        if (completedCount > 0) {
-            insights.push(`🎯 ยอดเยี่ยมมาก! เราช่วยกันฝากและเคลียร์เควสเงินสำเร็จไปแล้ว <b>${completedCount} ภารกิจ</b> เก่งมากจ้า!`);
+        if (completedCount === goals.length) {
+            allGoalsDone = true;
+            insights.push(`🎯 สุดยอดไปเลย! พวกเราทำภารกิจการเงินสำเร็จครบทั้งหมด <b>${completedCount} ภารกิจ</b> ในเดือนนี้แล้วจ้า! 🎉`);
+        } else if (completedCount > 0) {
+            insights.push(`🎯 ดีใจด้วยจ้า! พวกเราช่วยกันฝากและเคลียร์ภารกิจสำเร็จไปแล้ว <b>${completedCount}/${goals.length} ภารกิจ</b> สู้ต่ออีกนิดนะ!`);
         } else {
-            insights.push(`🎯 มีเควสออม/จ่ายเงินกองกลางคอยอยู่อีก <b>${goals.length} ภารกิจ</b> ลุยกันเลย!`);
+            insights.push(`🎯 ตอนนี้มีภารกิจเงินรออยู่ <b>${goals.length} เควส</b> ชวนกันมาพิชิตเป้าหมายกันเถอะ!`);
         }
     }
+
+    // ตรวจสอบยอดใช้จ่ายกองกลางเดือนนี้
+    let totalSharedExpenseThisMonth = 0;
+    txs.forEach(tx => {
+        const d = new Date(tx.created_at);
+        if (d.getMonth() === thisMonth && d.getFullYear() === thisYear && tx.owner === 'shared' && tx.type === 'expense') {
+            totalSharedExpenseThisMonth += parseFloat(tx.amount);
+        }
+    });
+
+    // ปรับเปลี่ยนอารมณ์พี่หมีตามเกณฑ์สุขภาพการเงิน
+    if (totalSharedExpenseThisMonth > 10000) {
+        bearState = "🐻💔";
+        bearBadge = "หมีใจสลาย";
+        insights.push(`🚨 <b>เตือนภัยกระเป๋าตังค์:</b> ค่าใช้จ่ายกองกลางเดือนนี้รวม <b>${totalSharedExpenseThisMonth.toLocaleString('th-TH')} บ.</b> เกินงบ 10,000 บ. ไปแล้วนะ! ประหยัดขึ้นด่วนจ้า!`);
+    } else if (isWarningCategory) {
+        bearState = "🐻⚠️";
+        bearBadge = "หมีเตือนภัย";
+    } else if (allGoalsDone || (txs.length > 0 && totalSharedExpenseThisMonth < 5000)) {
+        bearState = "🐻🎉";
+        bearBadge = "หมีอารมณ์ดี";
+    } else {
+        bearState = "🐻";
+        bearBadge = "พี่หมี AI";
+    }
+
+    if (bearEl) bearEl.innerText = bearState;
+    if (bearBadgeEl) bearBadgeEl.innerText = bearBadge;
 
     contentEl.innerHTML = `<ul class="mb-0 ps-3 d-flex flex-column gap-1.5">${insights.map(ins => `<li>${ins}</li>`).join('')}</ul>`;
 }
@@ -209,6 +254,11 @@ function switchTab(tabId) {
     if (activeBtn) activeBtn.classList.add('active');
 
     localStorage.setItem('activeTab', tabId);
+    
+    if (tabId === 'tools') {
+        setTimeout(initWheel, 50);
+        calculateSplitResult();
+    }
 }
 
 function toggleDarkMode() {
@@ -369,6 +419,9 @@ window.onload = function () {
 
             // โหลดรายการบิลประจำรายเดือน
             initRecurringBills();
+
+            // โหลดเควสสุ่มภารกิจล่าสุด
+            renderQuestState();
 
             // โหลดหมวดหมู่ และ โหลดตารางรายการเงินไปพร้อมๆ กัน ไม่ต้องรอคิว
             await Promise.all([loadCategories(), updateFilters()]);
@@ -1429,6 +1482,7 @@ async function loadTransactions() {
 
     let myTotal = 0; let partnerTotal = 0; let sharedTotal = 0; let emergencyTotal = 0;
     let totalMePaidShared = 0; let totalPartnerPaidShared = 0;
+    let totalMeActualShare = 0; let totalPartnerActualShare = 0;
     let categorySummary = {}; let totalExpenseFiltered = 0;
     const now = new Date(); const thisMonth = now.getMonth(); const thisYear = now.getFullYear();
 
@@ -1462,8 +1516,25 @@ async function loadTransactions() {
         else { isCurrentFilterMonth = true; }
 
         if (isCurrentFilterMonth && tx.type === 'expense') {
-            if (exactOwner === 'shared-me') totalMePaidShared += txAmount;
-            if (exactOwner === 'shared-partner') totalPartnerPaidShared += txAmount;
+            let mePct = 50;
+            let partnerPct = 50;
+            const ratioMatch = tx.note && tx.note.match(/สัดส่วน (?:โบ๊ท|คุณโบ๊ท)?\s*(\d+)\s*%\s*:\s*(?:เอิร์น|คุณเอิร์น)?\s*(\d+)\s*%/);
+            if (ratioMatch) {
+                mePct = parseInt(ratioMatch[1]);
+                partnerPct = parseInt(ratioMatch[2]);
+            }
+            const meShare = txAmount * (mePct / 100);
+            const partnerShare = txAmount * (partnerPct / 100);
+
+            if (exactOwner === 'shared-me') {
+                totalMePaidShared += txAmount;
+                totalMeActualShare += meShare;
+                totalPartnerActualShare += partnerShare;
+            } else if (exactOwner === 'shared-partner') {
+                totalPartnerPaidShared += txAmount;
+                totalMeActualShare += meShare;
+                totalPartnerActualShare += partnerShare;
+            }
         }
 
         let passOwnerFilter = true;
@@ -1574,11 +1645,22 @@ async function loadTransactions() {
     if (totalMePaidShared === 0 && totalPartnerPaidShared === 0) {
         if (billSummaryTextEl) billSummaryTextEl.innerHTML = `<div class="text-center py-2">🎉 ยังไม่มีรายจ่ายกองกลางร่วมกันในเดือนนี้<br><span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะช่วยหารครึ่งทันทีเมื่อจดรายการผ่านกระเป๋า "กองกลาง")</span></div>`;
     } else {
-        const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared; const halfShare = grandSharedExpense / 2; let settlementResultText = "";
-        if (totalMePaidShared > totalPartnerPaidShared) { const diff = totalMePaidShared - halfShare; settlementResultText = `🙋‍♀️ คุณเอิร์น ต้องโอนคืนให้ คุณโบ๊ท: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
-        else if (totalPartnerPaidShared > totalMePaidShared) { const diff = totalPartnerPaidShared - halfShare; settlementResultText = `🙋‍♂️ คุณโบ๊ท ต้องโอนคืนให้ คุณเอิร์น: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
-        else { settlementResultText = `🤝 ยอดออกเงินคนละครึ่งเท่ากันเป๊ะ พอดิบพอดีจ้า!`; }
-        if (billSummaryTextEl) billSummaryTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• คุณโบ๊ท ควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | คุณเอิร์น ควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
+        const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared;
+        let settlementResultText = "";
+        const netBoat = totalMePaidShared - totalMeActualShare;
+        const nameMe = localStorage.getItem('nameMe') || 'คุณโบ๊ท';
+        const namePartner = localStorage.getItem('namePartner') || 'คุณเอิร์น';
+
+        if (netBoat > 0.01) {
+            settlementResultText = `🙋‍♀️ ${namePartner} ต้องโอนคืนให้ ${nameMe}: <span class="fw-bold text-warning fs-5">${netBoat.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
+        } else if (netBoat < -0.01) {
+            const diff = Math.abs(netBoat);
+            settlementResultText = `🙋‍♂️ ${nameMe} ต้องโอนคืนให้ ${namePartner}: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`;
+        } else {
+            settlementResultText = `🤝 ยอดออกเงินสัดส่วนแชร์ร่วมกันลงตัวพอดีเป๊ะครับ!`;
+        }
+
+        if (billSummaryTextEl) billSummaryTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (คำนวณตามสัดส่วนจริง)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• ${nameMe} ควักจ่ายล่วงหน้า: ${totalMePaidShared.toLocaleString()} บ. | ${namePartner} ควักจ่ายล่วงหน้า: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
     }
     renderAnalytics(categorySummary, totalExpenseFiltered);
 
@@ -2256,4 +2338,538 @@ function updateMilestones(allTxs) {
         
         area.appendChild(card);
     });
+}
+
+// ==================== 🎰 ฟังก์ชันเพิ่มเติมสำหรับเฟส 2 ====================
+
+// --- 1. วงล้อสุ่มภารกิจประหยัดเงิน (Savings Wheel) ---
+const wheelTasks = [
+    { text: "งดชาไข่มุก/กาแฟวันนี้ 🥤", val: 50, type: "saving" },
+    { text: "หยอดออมฉุกเฉิน 50 บ. 💰", val: 50, type: "deposit" },
+    { text: "หยอดออมฉุกเฉิน 100 บ. 💸", val: 100, type: "deposit" },
+    { text: "งดฟาสต์ฟู้ด/เดลิเวอรี่ 1 วัน 🍔", val: 100, type: "saving" },
+    { text: "กอดคนรักฟรี 1 ครั้ง 💖", val: 0, type: "love" },
+    { text: "ทำอาหารทานเองร่วมกัน 🍱", val: 80, type: "saving" },
+    { text: "งดช้อปออนไลน์ 1 วัน 🛍️", val: 150, type: "saving" },
+    { text: "ทำความสะอาดบ้านร่วมกัน 🧹", val: 0, type: "chore" }
+];
+
+let isSpinning = false;
+let currentAngle = 0;
+let spinVelocity = 0;
+let animationFrameId = null;
+let activeQuestTemp = null;
+
+function initWheel() {
+    drawWheel(currentAngle);
+}
+
+function drawWheel(angle) {
+    const canvas = document.getElementById("wheelCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    const radius = width / 2;
+    const numSegments = wheelTasks.length;
+    const arcSize = (2 * Math.PI) / numSegments;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // สีสันพาสเทลพรีเมียม
+    const colors = [
+        "#ffb7b2", "#ffdac1", "#e2f0cb", "#b5ead7",
+        "#c7ceea", "#ff9aa2", "#e8d7ff", "#d5ebff"
+    ];
+
+    for (let i = 0; i < numSegments; i++) {
+        const segAngle = angle + i * arcSize;
+        ctx.beginPath();
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.moveTo(radius, radius);
+        ctx.arc(radius, radius, radius - 10, segAngle, segAngle + arcSize);
+        ctx.lineTo(radius, radius);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // เขียนข้อความในวงล้อหมุนแนวรัศมี
+        ctx.save();
+        ctx.fillStyle = "#2d3748";
+        ctx.font = "bold 11px 'Sarabun', sans-serif";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.translate(radius, radius);
+        ctx.rotate(segAngle + arcSize / 2);
+        const text = wheelTasks[i].text;
+        ctx.fillText(text, radius - 25, 0);
+        ctx.restore();
+    }
+
+    // จุดหมุนวงกลมสีทองหรูหราตรงกลาง
+    ctx.beginPath();
+    ctx.arc(radius, radius, 25, 0, 2 * Math.PI);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fill();
+    ctx.strokeStyle = "#d97706";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.fillStyle = "#78350f";
+    ctx.font = "bold 12px 'Sarabun', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🎰", radius, radius);
+}
+
+function spinWheel() {
+    if (isSpinning) return;
+    const ongoing = localStorage.getItem('ongoingQuest');
+    if (ongoing) {
+        alert("คุณมีภารกิจคาอยู่นะ ทำภารกิจปัจจุบันให้เสร็จ หรือกดยอมแพ้ก่อนสปินใหม่น้าา!");
+        return;
+    }
+    
+    isSpinning = true;
+    const btn = document.getElementById("btnSpin");
+    if (btn) btn.disabled = true;
+    
+    const activeQuestArea = document.getElementById("activeQuestArea");
+    if (activeQuestArea) activeQuestArea.classList.add("d-none");
+    
+    spinVelocity = 0.25 + Math.random() * 0.25; // สุ่มความเร็วต้นในการหมุน
+    let lastTickAngle = 0;
+    
+    function animateSpin() {
+        currentAngle += spinVelocity;
+        spinVelocity *= 0.982; // ค่อยๆ ช้าลงด้วยแรงต้าน
+        
+        // เล่นเสียงติ๊กเวลาข้ามเซกเมนต์
+        const arcSize = (2 * Math.PI) / wheelTasks.length;
+        const currentSegmentIdx = Math.floor(((currentAngle + Math.PI/2) % (2 * Math.PI)) / arcSize);
+        const lastSegmentIdx = Math.floor(((lastTickAngle + Math.PI/2) % (2 * Math.PI)) / arcSize);
+        if (currentSegmentIdx !== lastSegmentIdx) {
+            playSynthSound("tick");
+            lastTickAngle = currentAngle;
+        }
+
+        drawWheel(currentAngle);
+
+        if (spinVelocity < 0.002) {
+            isSpinning = false;
+            if (btn) btn.disabled = false;
+            cancelAnimationFrame(animationFrameId);
+            determineWinningSegment();
+        } else {
+            animationFrameId = requestAnimationFrame(animateSpin);
+        }
+    }
+    
+    animateSpin();
+}
+
+function determineWinningSegment() {
+    const numSegments = wheelTasks.length;
+    const arcSize = (2 * Math.PI) / numSegments;
+    let relAngle = (-Math.PI / 2 - currentAngle) % (2 * Math.PI);
+    if (relAngle < 0) relAngle += 2 * Math.PI;
+    
+    const winningIdx = Math.floor(relAngle / arcSize) % numSegments;
+    const wonQuest = wheelTasks[winningIdx];
+    
+    playSynthSound("success");
+    activeQuestTemp = wonQuest;
+    
+    const activeQuestArea = document.getElementById("activeQuestArea");
+    const questText = document.getElementById("questText");
+    if (activeQuestArea && questText) {
+        questText.innerHTML = wonQuest.text;
+        activeQuestArea.classList.remove("d-none");
+    }
+}
+
+function acceptQuest() {
+    if (!activeQuestTemp) return;
+    localStorage.setItem("ongoingQuest", JSON.stringify(activeQuestTemp));
+    activeQuestTemp = null;
+    document.getElementById("activeQuestArea").classList.add("d-none");
+    renderQuestState();
+    showToast("🎯 ยอมรับคำท้าเรียบร้อย ลุยกันเลยคู่รัก!", "✨");
+}
+
+function cancelQuest() {
+    activeQuestTemp = null;
+    document.getElementById("activeQuestArea").classList.add("d-none");
+}
+
+function renderQuestState() {
+    const ongoing = localStorage.getItem("ongoingQuest");
+    const activeArea = document.getElementById("activeQuestArea");
+    const ongoingArea = document.getElementById("ongoingQuestArea");
+    const ongoingText = document.getElementById("ongoingQuestText");
+    
+    if (ongoing) {
+        const quest = JSON.parse(ongoing);
+        if (ongoingArea && ongoingText) {
+            ongoingText.innerHTML = quest.text;
+            ongoingArea.classList.remove("d-none");
+        }
+        if (activeArea) activeArea.classList.add("d-none");
+    } else {
+        if (ongoingArea) ongoingArea.classList.add("d-none");
+    }
+}
+
+async function completeQuest() {
+    const ongoing = localStorage.getItem("ongoingQuest");
+    if (!ongoing) return;
+    const quest = JSON.parse(ongoing);
+    
+    if (quest.type === "deposit") {
+        const amount = parseFloat(quest.val);
+        const noteText = `[เควสสุ่มรายวัน] ทำสำเร็จ: ${quest.text}`;
+        
+        try {
+            const { error } = await supabaseClient.from("transactions").insert([{
+                amount: amount,
+                type: "income",
+                category_name: "ออมเงินสำรอง",
+                note: noteText,
+                owner: "emergency",
+                created_at: new Date().toISOString()
+            }]);
+            if (error) throw error;
+            
+            showToast(`🎉 ทำสำเร็จ! หยอดกระปุกฉุกเฉิน ${amount} บ. เรียบร้อย`, "💰");
+        } catch (err) {
+            console.error("Error inserting quest transaction:", err);
+            showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่", "❌");
+            return;
+        }
+    } else {
+        showToast(`🎉 เก่งมาก! ทำภารกิจสำเร็จ: ${quest.text}`, "✨");
+    }
+    
+    playSynthSound("cash");
+    if (typeof confetti === "function") {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    }
+    
+    localStorage.removeItem("ongoingQuest");
+    renderQuestState();
+    loadTransactions();
+}
+
+function forfeitQuest() {
+    if (confirm("แน่ใจหรอว่าจะยอมแพ้ภารกิจนี้? พี่หมีเสียใจน้าา 🐻💔")) {
+        localStorage.removeItem("ongoingQuest");
+        renderQuestState();
+        showToast("ยกเลิกภารกิจแล้ว เริ่มหมุนใหม่ได้เลยครับ", "🍃");
+    }
+}
+
+// เครื่องมือเสียงสังเคราะห์ออฟไลน์ (Web Audio API Synthesizer)
+function playSynthSound(type) {
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        if (type === "tick") {
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+            gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        } else if (type === "success") {
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(261.63, audioCtx.currentTime); // C4
+            osc.frequency.setValueAtTime(329.63, audioCtx.currentTime + 0.08); // E4
+            osc.frequency.setValueAtTime(392.00, audioCtx.currentTime + 0.16); // G4
+            osc.frequency.setValueAtTime(523.25, audioCtx.currentTime + 0.24); // C5
+            gainNode.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.35);
+        } else if (type === "cash") {
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(1100, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(2200, audioCtx.currentTime + 0.08);
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+    } catch (e) {
+        console.warn("Synth audio error:", e);
+    }
+}
+
+// --- 2. เครื่องมือหารค่าใช้จ่ายด่วน (Couple Bill Splitter) ---
+function toggleCustomRatioUI() {
+    const ratio = document.getElementById("splitRatio").value;
+    const customArea = document.getElementById("customSplitArea");
+    if (ratio === "custom") {
+        customArea.classList.remove("d-none");
+    } else {
+        customArea.classList.add("d-none");
+    }
+}
+
+function adjustPartnerPercent() {
+    let mePct = parseInt(document.getElementById("splitPercentMe").value);
+    if (isNaN(mePct)) mePct = 50;
+    const clampedMe = Math.min(100, Math.max(0, mePct));
+    document.getElementById("splitPercentMe").value = clampedMe;
+    document.getElementById("splitPercentPartner").value = 100 - clampedMe;
+    calculateSplitResult();
+}
+
+function adjustMePercent() {
+    let partnerPct = parseInt(document.getElementById("splitPercentPartner").value);
+    if (isNaN(partnerPct)) partnerPct = 50;
+    const clampedPartner = Math.min(100, Math.max(0, partnerPct));
+    document.getElementById("splitPercentPartner").value = clampedPartner;
+    document.getElementById("splitPercentMe").value = 100 - clampedPartner;
+    calculateSplitResult();
+}
+
+function calculateSplitResult() {
+    const amtInput = document.getElementById("splitAmount").value;
+    const summaryEl = document.getElementById("splitSummaryText");
+    if (!summaryEl) return;
+    
+    if (!amtInput || parseFloat(amtInput) <= 0) {
+        summaryEl.innerHTML = "กรุณากรอกยอดเงิน";
+        return;
+    }
+    
+    const amount = parseFloat(amtInput);
+    const payer = document.getElementById("splitPayer").value;
+    const ratioVal = document.getElementById("splitRatio").value;
+    
+    let mePct = 50;
+    let partnerPct = 50;
+    
+    if (ratioVal === "50-50") {
+        mePct = 50; partnerPct = 50;
+    } else if (ratioVal === "60-40") {
+        mePct = 60; partnerPct = 40;
+    } else if (ratioVal === "40-60") {
+        mePct = 40; partnerPct = 60;
+    } else if (ratioVal === "custom") {
+        mePct = parseInt(document.getElementById("splitPercentMe").value);
+        if (isNaN(mePct)) mePct = 50;
+        partnerPct = 100 - mePct;
+    }
+    
+    const nameMe = localStorage.getItem("nameMe") || "คุณโบ๊ท";
+    const namePartner = localStorage.getItem("namePartner") || "คุณเอิร์น";
+    
+    if (payer === "me") {
+        const payBack = amount * (partnerPct / 100);
+        summaryEl.innerHTML = `💸 ยอดรวม ${amount.toLocaleString()} บ. (${nameMe} ออกก่อน)<br><b>${namePartner} ต้องโอนคืน ${nameMe}</b> = <span class="fs-4 text-indigo fw-extrabold">${payBack.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</span> บาท`;
+    } else {
+        const payBack = amount * (mePct / 100);
+        summaryEl.innerHTML = `💸 ยอดรวม ${amount.toLocaleString()} บ. (${namePartner} ออกก่อน)<br><b>${nameMe} ต้องโอนคืน ${namePartner}</b> = <span class="fs-4 text-indigo fw-extrabold">${payBack.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</span> บาท`;
+    }
+}
+
+async function saveSplitBill() {
+    const title = document.getElementById("splitTitle").value.trim();
+    const amtInput = document.getElementById("splitAmount").value;
+    
+    if (!title) return alert("กรุณากรอกชื่อรายการค่าใช้จ่าย!");
+    if (!amtInput || parseFloat(amtInput) <= 0) return alert("กรุณากรอกยอดเงินรวมให้ถูกต้อง!");
+    
+    const amount = parseFloat(amtInput);
+    const payer = document.getElementById("splitPayer").value;
+    const ratioVal = document.getElementById("splitRatio").value;
+    
+    let mePct = 50;
+    let partnerPct = 50;
+    
+    if (ratioVal === "50-50") {
+        mePct = 50; partnerPct = 50;
+    } else if (ratioVal === "60-40") {
+        mePct = 60; partnerPct = 40;
+    } else if (ratioVal === "40-60") {
+        mePct = 40; partnerPct = 60;
+    } else if (ratioVal === "custom") {
+        mePct = parseInt(document.getElementById("splitPercentMe").value);
+        if (isNaN(mePct)) mePct = 50;
+        partnerPct = 100 - mePct;
+    }
+
+    const nameMe = localStorage.getItem("nameMe") || "คุณโบ๊ท";
+    const namePartner = localStorage.getItem("namePartner") || "คุณเอิร์น";
+    
+    if (!confirm(`ต้องการบันทึกค่าใช้จ่าย "${title}" ยอดเงิน ${amount.toLocaleString()} บ. (สัดส่วน โบ๊ท ${mePct}% : เอิร์น ${partnerPct}%) เข้ากองกลาง?`)) return;
+
+    // ฟอร์แมตโน้ตตามมาตรฐานการประมวลผลกระเป๋ากองกลาง
+    let prefix = payer === "me" ? "[จ่ายโดย: me]" : "[จ่ายโดย: partner]";
+    let finalNote = `${prefix} [หารค่าใช้จ่าย] ${title} (สัดส่วน โบ๊ท ${mePct}% : เอิร์น ${partnerPct}%)`;
+    
+    try {
+        const { error } = await supabaseClient.from("transactions").insert([{
+            amount: amount,
+            type: "expense",
+            category_name: getCategoryForBill(title),
+            note: finalNote,
+            owner: "shared",
+            created_at: new Date().toISOString()
+        }]);
+        
+        if (error) throw error;
+        
+        showToast("บันทึกค่าใช้จ่ายหารลง Supabase กองกลางสำเร็จ! 🍕", "🤝");
+        playSynthSound("cash");
+        
+        // ล้างฟอร์ม
+        document.getElementById("splitTitle").value = "";
+        document.getElementById("splitAmount").value = "";
+        calculateSplitResult();
+        
+        loadTransactions();
+    } catch (err) {
+        console.error("Error saving split transaction:", err);
+        showToast(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${err.message}`, "❌", true);
+    }
+}
+
+// --- 3. ระบบส่งออกรายงานรายเดือนเป็น PDF (PDF Monthly Report Generator) ---
+function generateMonthlyReportPDF() {
+    const printContainer = document.getElementById("monthlyReportPrintLayout");
+    if (!printContainer) return;
+    
+    const now = new Date();
+    const monthsTh = [
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ];
+    const monthTitle = `${monthsTh[now.getMonth()]} ${now.getFullYear() + 543}`;
+    
+    const nameMe = localStorage.getItem("nameMe") || "คุณโบ๊ท";
+    const namePartner = localStorage.getItem("namePartner") || "คุณเอิร์น";
+    
+    // ดึงค่าสถิติปัจจุบันจาก DOM หน้าบ้านมาจัดรายงาน
+    const myBal = document.getElementById("myTotal")?.innerText || "0.00 บาท";
+    const partnerBal = document.getElementById("partnerTotal")?.innerText || "0.00 บาท";
+    const sharedBal = document.getElementById("sharedTotal")?.innerText || "0.00 บาท";
+    const emergencyBal = document.getElementById("emergencyTotal")?.innerText || "0.00 บาท";
+    
+    // ดึงรายการประวัติ 12 รายการล่าสุด
+    let txRowsHTML = "";
+    const tbody = document.getElementById("txTableBody");
+    if (tbody) {
+        const rows = tbody.querySelectorAll("tr");
+        let count = 0;
+        rows.forEach(r => {
+            if (count >= 12) return; // แสดง 12 รายการล่าสุดในรายงาน
+            const tds = r.querySelectorAll("td");
+            if (tds.length >= 5) {
+                const dateText = tds[0].innerText;
+                const ownerText = tds[1].innerText;
+                const catText = tds[2].innerText;
+                const amountText = tds[3].innerText;
+                const noteText = tds[4].innerText;
+                txRowsHTML += `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px 4px; font-size: 0.8rem;">${dateText}</td>
+                        <td style="padding: 8px 4px; font-size: 0.8rem;">${ownerText}</td>
+                        <td style="padding: 8px 4px; font-size: 0.8rem;">${catText}</td>
+                        <td style="padding: 8px 4px; font-size: 0.8rem; font-weight: bold;">${amountText}</td>
+                        <td style="padding: 8px 4px; font-size: 0.8rem; color: #475569;">${noteText}</td>
+                    </tr>
+                `;
+                count++;
+            }
+        });
+    }
+    
+    if (!txRowsHTML) {
+        txRowsHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #94a3b8;">ไม่มีข้อมูลรายการเงินในรอบเดือนนี้</td></tr>`;
+    }
+
+    // ประกอบร่างดีไซน์รายงานพรีเมียม
+    printContainer.innerHTML = `
+        <div style="font-family: 'Sarabun', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: white;">
+            <!-- ส่วนหัว -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #6366f1; padding-bottom: 15px; margin-bottom: 25px;">
+                <div>
+                    <h2 style="margin: 0; color: #4f46e5; font-size: 1.6rem; font-weight: 800;">👩‍❤️‍👨 รายงานการเงินคู่รักประจำเดือน</h2>
+                    <p style="margin: 5px 0 0 0; color: #64748b; font-size: 0.9rem;">รอบการเงินประจำเดือน: <b>${monthTitle}</b></p>
+                </div>
+                <div style="text-align: right;">
+                    <p style="margin: 0; font-size: 0.75rem; color: #94a3b8;">วันที่พิมพ์เอกสาร: ${now.toLocaleDateString("th-TH")} ${now.toLocaleTimeString("th-TH")}</p>
+                    <span style="display: inline-block; background: #ecfdf5; color: #047857; font-weight: bold; font-size: 0.75rem; padding: 4px 10px; border-radius: 8px; margin-top: 5px;">💰 Supabase Synced</span>
+                </div>
+            </div>
+
+            <!-- สรุปยอดกระเป๋าเงิน -->
+            <h4 style="color: #1e293b; font-weight: bold; border-left: 4px solid #6366f1; padding-left: 10px; margin-bottom: 15px;">📊 ยอดเงินคงเหลือรายกระเป๋า</h4>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 25px;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center;">
+                    <p style="margin: 0 0 5px 0; font-size: 0.75rem; color: #64748b;">กระเป๋า ${nameMe}</p>
+                    <h5 style="margin: 0; color: #1e3a8a; font-size: 0.95rem; font-weight: bold;">${myBal}</h5>
+                </div>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center;">
+                    <p style="margin: 0 0 5px 0; font-size: 0.75rem; color: #64748b;">กระเป๋า ${namePartner}</p>
+                    <h5 style="margin: 0; color: #9f1239; font-size: 0.95rem; font-weight: bold;">${partnerBal}</h5>
+                </div>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center;">
+                    <p style="margin: 0 0 5px 0; font-size: 0.75rem; color: #64748b;">เงินกองกลางร่วมกัน</p>
+                    <h5 style="margin: 0; color: #854d0e; font-size: 0.95rem; font-weight: bold;">${sharedBal}</h5>
+                </div>
+                <div style="background: #f8fafc; border: 1px solid #10b981; border-radius: 12px; padding: 12px; text-align: center;">
+                    <p style="margin: 0 0 5px 0; font-size: 0.75rem; color: #047857; font-weight: bold;">ออมสำรองฉุกเฉิน</p>
+                    <h5 style="margin: 0; color: #065f46; font-size: 0.95rem; font-weight: bold;">${emergencyBal}</h5>
+                </div>
+            </div>
+
+            <!-- ตารางรายการเดินบัญชีล่าสุด -->
+            <h4 style="color: #1e293b; font-weight: bold; border-left: 4px solid #6366f1; padding-left: 10px; margin-bottom: 15px;">🕒 ประวัติทำรายการการเงิน (ล่าสุด)</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #cbd5e1; text-align: left; background: #f8fafc;">
+                        <th style="padding: 8px 4px; font-size: 0.85rem; color: #475569;">วัน-เวลา</th>
+                        <th style="padding: 8px 4px; font-size: 0.85rem; color: #475569;">บัญชี</th>
+                        <th style="padding: 8px 4px; font-size: 0.85rem; color: #475569;">หมวดหมู่</th>
+                        <th style="padding: 8px 4px; font-size: 0.85rem; color: #475569;">จำนวนเงิน</th>
+                        <th style="padding: 8px 4px; font-size: 0.85rem; color: #475569;">บันทึกช่วยจำ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${txRowsHTML}
+                </tbody>
+            </table>
+
+            <!-- ลายเซ็นยินยอมสรุปยอดสิ้นเดือน -->
+            <div style="margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: center;">
+                <div>
+                    <div style="border-bottom: 1px solid #94a3b8; height: 40px; width: 200px; margin: 0 auto 5px auto;"></div>
+                    <p style="margin: 0; font-size: 0.85rem; color: #64748b;">ลงชื่อ: <b>${nameMe}</b></p>
+                </div>
+                <div>
+                    <div style="border-bottom: 1px solid #94a3b8; height: 40px; width: 200px; margin: 0 auto 5px auto;"></div>
+                    <p style="margin: 0; font-size: 0.85rem; color: #64748b;">ลงชื่อ: <b>${namePartner}</b></p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                <p style="margin: 0; font-size: 0.75rem; color: #94a3b8;">สร้างสรรค์ขึ้นด้วยความรัก ❤️ โดยคู่รักบันทึกรายรับรายจ่าย</p>
+            </div>
+        </div>
+    `;
+
+    // เรียกหน้าต่างพิมพ์เฉพาะเอกสาร PDF
+    window.print();
 }

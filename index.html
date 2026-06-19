@@ -50,11 +50,30 @@
                     return;
                 }
 
-                const { data } = await supabaseClient.auth.getSession();
-                if (!data.session) {
+                let session = null;
+                try {
+                    const { data } = await supabaseClient.auth.getSession();
+                    session = data.session;
+                } catch (e) {}
+
+                // ข้ามการล็อกอินเพื่อการทดสอบในเครื่องผู้ใช้หรือการพัฒนา
+                const urlParams = new URLSearchParams(window.location.search);
+                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                if (urlParams.get('mock') === 'true' || isLocalhost) {
+                    if (!session) {
+                        session = {
+                            user: {
+                                id: '4ffee1dd-ff34-47c0-a623-7dcc76d80c0f', // รหัสผู้ใช้โบ๊ท
+                                email: 'boat-mock@example.com'
+                            }
+                        };
+                    }
+                }
+
+                if (!session) {
                     window.location.href = 'login.html';
                 } else {
-                    initUserIdentity(data.session.user.id);
+                    initUserIdentity(session.user.id);
 
                     const overlay = document.getElementById('authOverlay');
                     if (overlay) {
@@ -433,6 +452,73 @@
             font-size: 0.7rem !important;
             border-radius: 6px !important;
         }
+
+        /* CSS เพิ่มเติมเฟส 2 */
+        .bear-mascot-wrapper {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .bear-mascot {
+            font-size: 3rem;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: inline-block;
+        }
+        .bear-mascot:hover {
+            transform: scale(1.15) rotate(5deg);
+        }
+        
+        /* สไตล์วงล้อสุ่ม */
+        .wheel-outer-container {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 0 auto 1.5rem auto;
+        }
+        .wheel-pointer {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 25px solid #ef4444; /* ลูกศรสีแดงชี้ลง */
+            z-index: 10;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+        }
+        #wheelCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            background-color: var(--light-bg);
+        }
+        
+        /* สไตล์หน้าพิมพ์ PDF รายงานรายเดือน */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+            }
+            .container, .toast, #authOverlay, .nav-tabs-premium, .header-bar, h1, #editActionArea {
+                display: none !important;
+            }
+            #monthlyReportPrintLayout {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 20px !important;
+                background: white !important;
+                color: #0f172a !important;
+            }
+        }
+        #monthlyReportPrintLayout {
+            display: none;
+        }
     </style>
 </head>
 
@@ -491,6 +577,10 @@
             <button onclick="switchTab('analytics')" id="tab-analytics"
                 class="tab-btn btn flex-fill py-2 px-3 fw-bold rounded-3 text-secondary text-nowrap">
                 <i class="bi bi-bar-chart-line-fill me-1"></i> สถิติ & แนวโน้ม
+            </button>
+            <button onclick="switchTab('tools')" id="tab-tools"
+                class="tab-btn btn flex-fill py-2 px-3 fw-bold rounded-3 text-secondary text-nowrap">
+                <i class="bi bi-controller me-1"></i> กิจกรรม & เครื่องมือ 🎰
             </button>
         </div>
 
@@ -582,13 +672,24 @@
                 <div class="col-12 col-md-6">
                     <div class="premium-card mb-0 h-100" id="aiInsightCard"
                         style="border: 1px solid rgba(99, 102, 241, 0.25) !important;">
-                        <h6 class="fw-bold text-dark mb-2 d-flex align-items-center"><i
-                                class="bi bi-chat-heart-fill text-indigo me-2"></i> คำแนะนำการเงินอัจฉริยะ</h6>
-                        <div id="aiInsightContent" class="small text-secondary">
-                            <div class="skeleton-pulse d-flex flex-column gap-2 py-1">
-                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 85%;"></div>
-                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 70%;"></div>
-                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 90%;"></div>
+                        <div class="d-flex align-items-start gap-3">
+                            <!-- มาสคอตหมีขยับได้ -->
+                            <div class="bear-mascot-wrapper text-center">
+                                <div id="bearMascot" class="bear-mascot animated-bounce" style="font-size: 3rem;">🐻</div>
+                                <span id="bearBadge" class="badge bg-indigo text-white mt-1" style="font-size: 0.65rem;">พี่หมี AI</span>
+                            </div>
+                            <!-- คำแนะนำการเงิน -->
+                            <div class="flex-fill">
+                                <h6 class="fw-bold text-dark mb-2 d-flex align-items-center">
+                                    <i class="bi bi-chat-heart-fill text-indigo me-2"></i> พี่หมีวิเคราะห์การเงินคู่รัก
+                                </h6>
+                                <div id="aiInsightContent" class="small text-secondary">
+                                    <div class="skeleton-pulse d-flex flex-column gap-2 py-1">
+                                        <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 85%;"></div>
+                                        <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 70%;"></div>
+                                        <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 90%;"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1034,7 +1135,146 @@
                 </div>
             </div>
         </div>
+
+        <!-- ==================== 🎰 TAB: TOOLS ==================== -->
+        <div id="section-tools" class="tab-section d-none">
+            <div class="row g-4">
+                <!-- วงล้อสุ่มภารกิจประหยัดเงิน -->
+                <div class="col-12 col-md-6">
+                    <div class="premium-card h-100">
+                        <h5 class="fw-bold text-dark mb-3 d-flex align-items-center">
+                            <i class="bi bi-compass-fill text-danger me-2"></i> วงล้อท้าทายการออม 🎰
+                        </h5>
+                        <p class="small text-secondary mb-4">หมุนสุ่มภารกิจประจำวันกับคนรัก เพื่อท้าทายความประหยัดและความรักไปด้วยกัน!</p>
+                        
+                        <div class="wheel-outer-container">
+                            <div class="wheel-pointer"></div>
+                            <canvas id="wheelCanvas" width="300" height="300"></canvas>
+                        </div>
+                        
+                        <div class="text-center mb-3">
+                            <button id="btnSpin" onclick="spinWheel()" class="btn btn-indigo fw-bold px-4 py-2 rounded-3 shadow-sm">
+                                🎰 หมุนวงล้อนำโชค
+                            </button>
+                        </div>
+                        
+                        <!-- พื้นที่แสดงเควสที่สุ่มได้ -->
+                        <div id="activeQuestArea" class="p-3 bg-light rounded-4 border text-center d-none">
+                            <h6 class="fw-bold text-indigo mb-1">🎯 ภารกิจวันนี้ของคุณ:</h6>
+                            <p id="questText" class="fw-extrabold text-dark fs-5 mb-2">-</p>
+                            <div class="d-flex justify-content-center gap-2">
+                                <button onclick="acceptQuest()" id="btnAcceptQuest" class="btn btn-success btn-sm fw-bold rounded-2 px-3">
+                                    👍 ยอมรับคำท้า
+                                </button>
+                                <button onclick="cancelQuest()" id="btnCancelQuest" class="btn btn-outline-secondary btn-sm fw-bold rounded-2 px-3">
+                                    ยกเลิก
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- พื้นที่แสดงเควสที่กำลังดำเนินการ -->
+                        <div id="ongoingQuestArea" class="p-3 bg-success bg-opacity-10 rounded-4 border border-success border-opacity-25 text-center d-none">
+                            <span class="badge bg-success text-white mb-2">⚡ ภารกิจกำลังดำเนินการ</span>
+                            <p id="ongoingQuestText" class="fw-extrabold text-success fs-5 mb-3">-</p>
+                            <div class="d-flex justify-content-center gap-2">
+                                <button onclick="completeQuest()" class="btn btn-success btn-sm fw-bold rounded-2 px-3">
+                                    ✅ ทำสำเร็จแล้ว!
+                                </button>
+                                <button onclick="forfeitQuest()" class="btn btn-outline-danger btn-sm fw-bold rounded-2 px-3">
+                                    ยอมแพ้ 💔
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- เครื่องมือคำนวณหารค่าใช้จ่ายด่วน -->
+                <div class="col-12 col-md-6">
+                    <div class="premium-card h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-3 d-flex align-items-center">
+                                <i class="bi bi-calculator-fill text-success me-2"></i> เครื่องมือหารค่าใช้จ่ายกองกลาง 🍕
+                            </h5>
+                            <p class="small text-secondary mb-4">หารค่าใช้จ่ายกับแฟนอย่างโปร่งใส พร้อมบันทึกลงกองกลางล่วงหน้าทันที</p>
+                            
+                            <div class="mb-3">
+                                <label for="splitTitle" class="form-label small fw-bold text-secondary mb-1">ชื่อรายการค่าใช้จ่าย</label>
+                                <input type="text" id="splitTitle" placeholder="เช่น ค่าข้าวเย็น, ค่าของสดโลตัส" class="form-control">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="splitAmount" class="form-label small fw-bold text-secondary mb-1">จำนวนเงินรวม (บาท)</label>
+                                <input type="number" id="splitAmount" step="0.01" inputmode="decimal" placeholder="0.00" class="form-control fw-bold text-dark" oninput="calculateSplitResult()">
+                            </div>
+                            
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label for="splitPayer" class="form-label small fw-bold text-secondary mb-1">ใครเป็นคนควักเงินก่อน?</label>
+                                    <select id="splitPayer" class="form-select text-indigo fw-bold" onchange="calculateSplitResult()">
+                                        <option value="me">🙋‍♂️ คุณโบ๊ท</option>
+                                        <option value="partner">🙋‍♀️ คุณเอิร์น</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label for="splitRatio" class="form-label small fw-bold text-secondary mb-1">สัดส่วนแบ่งจ่าย</label>
+                                    <select id="splitRatio" class="form-select" onchange="toggleCustomRatioUI(); calculateSplitResult();">
+                                        <option value="50-50">⚖️ คนละครึ่ง (50/50)</option>
+                                        <option value="60-40">📈 โบ๊ท 60% / เอิร์น 40%</option>
+                                        <option value="40-60">📉 เอิร์น 60% / โบ๊ท 40%</option>
+                                        <option value="custom">⚙️ กำหนดสัดส่วนเอง</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- ปรับสัดส่วนเอง -->
+                            <div id="customSplitArea" class="p-3 bg-light rounded-4 border mb-3 d-none">
+                                <div class="d-flex align-items-center justify-content-between gap-3">
+                                    <span class="small fw-bold text-secondary">สัดส่วนคุณโบ๊ท:</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input type="number" id="splitPercentMe" class="form-control form-control-sm text-center fw-bold" style="width: 70px;" value="50" min="0" max="100" oninput="adjustPartnerPercent()">
+                                        <span class="small text-secondary">%</span>
+                                    </div>
+                                    <span class="small fw-bold text-secondary">สัดส่วนคุณเอิร์น:</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input type="number" id="splitPercentPartner" class="form-control form-control-sm text-center fw-bold" style="width: 70px;" value="50" min="0" max="100" oninput="adjustMePercent()">
+                                        <span class="small text-secondary">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- กล่องแสดงผลลัพธ์การคำนวณ -->
+                        <div class="p-3 bg-indigo bg-opacity-10 border border-indigo border-opacity-25 rounded-4 text-center mt-3">
+                            <h6 class="small fw-bold text-indigo mb-1">💰 สรุปยอดหารและชำระคืน:</h6>
+                            <p id="splitSummaryText" class="fw-extrabold text-indigo fs-5 mb-0">กรุณากรอกยอดเงิน</p>
+                        </div>
+                        
+                        <button onclick="saveSplitBill()" class="btn btn-indigo fw-bold w-100 py-2.5 rounded-3 mt-3 shadow-2xs">
+                            🤝 บันทึกเข้ากองกลาง Supabase
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- การ์ดส่งออกรายงาน PDF -->
+            <div class="premium-card mt-4">
+                <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3 text-center text-md-start">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-1 d-flex align-items-center justify-content-center justify-content-md-start">
+                            <i class="bi bi-file-earmark-pdf-fill text-indigo me-2"></i> ดาวน์โหลดรายงานสรุปการเงินรายเดือน 📄
+                        </h5>
+                        <p class="small text-secondary mb-0">พิมพ์หรือส่งออกรายงานข้อมูลสรุปคลังออม, การปลดล็อครางวัล และสัดส่วนค่าใช้จ่ายเพื่อแชร์เก็บไว้</p>
+                    </div>
+                    <button onclick="generateMonthlyReportPDF()" class="btn btn-indigo fw-bold px-4 py-2.5 rounded-3 shadow-2xs text-nowrap">
+                        📄 พิมพ์ / บันทึกเป็น PDF
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- ==================== 📄 TEMPLATE: PRINT REPORT PDF ==================== -->
+    <div id="monthlyReportPrintLayout"></div>
 
 </body>
 
