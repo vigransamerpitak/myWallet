@@ -11,6 +11,84 @@ let currentPage = 1;
 const ROWS_PER_PAGE = 20;
 let filteredTxsCache = []; // เก็บข้อมูลหลัง filter เพื่อใช้กับ pagination + export
 
+// === ฟังก์ชันสำหรับระบบ UI/UX แท็บ, โหมดถนอมสายตา และการจัดการยอดเงิน ===
+function switchTab(tabId) {
+    const sections = document.querySelectorAll('.tab-section');
+    sections.forEach(s => s.classList.add('d-none'));
+
+    const activeSection = document.getElementById(`section-${tabId}`);
+    if (activeSection) activeSection.classList.remove('d-none');
+
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => btn.classList.remove('active'));
+
+    const activeBtn = document.getElementById(`tab-${tabId}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    localStorage.setItem('activeTab', tabId);
+}
+
+function toggleDarkMode() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const targetTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', targetTheme);
+    localStorage.setItem('theme', targetTheme);
+    updateDarkModeToggleIcon(targetTheme);
+}
+
+function updateDarkModeToggleIcon(theme) {
+    const toggleBtn = document.getElementById('darkModeToggle');
+    if (!toggleBtn) return;
+    if (theme === 'dark') {
+        toggleBtn.innerHTML = '<i class="bi bi-sun-fill text-warning"></i>';
+    } else {
+        toggleBtn.innerHTML = '<i class="bi bi-moon-stars-fill text-dark"></i>';
+    }
+}
+
+function getCategoryEmoji(name) {
+    if (!name) return '📦 อื่นๆ';
+    const clean = name.trim();
+    const mapping = {
+        'อาหาร': '🍔 อาหาร',
+        'เครื่องดื่ม': '☕ เครื่องดื่ม',
+        'ช้อปปิ้ง': '🛍️ ช้อปปิ้ง',
+        'ชอปปิ้ง': '🛍️ ช้อปปิ้ง',
+        'เดินทาง': '🚗 เดินทาง',
+        'ค่าเดินทาง': '🚗 ค่าเดินทาง',
+        'ค่าบ้าน': '🏠 ค่าบ้าน/ที่พัก',
+        'ค่าที่พัก/บ้าน': '🏠 ค่าบ้าน/ที่พัก',
+        'ค่าน้ำค่าไฟ': '💡 ค่าน้ำค่าไฟ',
+        'ความบันเทิง': '🎬 ความบันเทิง',
+        'สุขภาพ': '🏥 สุขภาพ',
+        'ของใช้ส่วนตัว': '🧼 ของใช้ส่วนตัว',
+        'ลงทุน': '📈 ลงทุน',
+        'เงินเดือน': '💵 เงินเดือน',
+        'โบนัส': '🎁 โบนัส',
+        'สลิปรอระบุหมวดหมู่': '⏳ รอระบุหมวดหมู่',
+        'ทั่วไป': '📦 ทั่วไป',
+        'ท่องเที่ยว': '✈️ ท่องเที่ยว',
+        'ค่าโทรศัพท์/เน็ต': '📱 ค่าโทรศัพท์/เน็ต',
+        'ของใช้ในบ้าน': '🧹 ของใช้ในบ้าน',
+        'ของขวัญ': '💝 ของขวัญ',
+        'การศึกษา': '📚 การศึกษา',
+        'อื่นๆ': '📦 อื่นๆ'
+    };
+    return mapping[clean] || `🏷️ ${clean}`;
+}
+
+function adjustAmount(val) {
+    const input = document.getElementById('txAmount');
+    if (!input) return;
+    let currentVal = parseFloat(input.value) || 0;
+    input.value = (currentVal + val).toFixed(2);
+}
+
+function clearAmount() {
+    const input = document.getElementById('txAmount');
+    if (input) input.value = '';
+}
+
 function initUserIdentity(userId) {
     const userDisplay = document.getElementById('userDisplay');
     const txOwnerInput = document.getElementById('txOwner');
@@ -29,6 +107,15 @@ window.onload = function () {
     setTimeout(async () => {
         try {
             setupSlipScannerListener(); // เปิดระบบดักจับและส่งสลิปให้ AI ประมวลผล
+            
+            // คืนค่าแท็บล่าสุด หรือ หน้าแรก
+            const activeTab = localStorage.getItem('activeTab') || 'dashboard';
+            switchTab(activeTab);
+
+            // คืนค่าธีมล่าสุด
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            updateDarkModeToggleIcon(savedTheme);
+
             // โหลดหมวดหมู่ และ โหลดตารางรายการเงินไปพร้อมๆ กัน ไม่ต้องรอคิว
             await Promise.all([loadCategories(), updateFilters()]);
         } catch (err) {
@@ -393,7 +480,7 @@ async function loadCategories() {
     expenseArea.innerHTML = ''; incomeArea.innerHTML = '';
     categories.forEach(cat => {
         const btn = document.createElement('button');
-        btn.innerText = cat.name;
+        btn.innerText = getCategoryEmoji(cat.name);
         btn.className = cat.type === 'expense' ? "btn btn-outline-danger btn-sm category-btn" : "btn btn-outline-success btn-sm category-btn";
         btn.onclick = () => saveTransaction(cat.name, cat.type);
         if (cat.type === 'expense') expenseArea.appendChild(btn); else incomeArea.appendChild(btn);
@@ -454,6 +541,9 @@ function escapeForAttr(str) {
 }
 
 function enterEditMode(id, amount, note, originalOwner) {
+    // เปลี่ยนหน้าแท็บไปยังหน้าจดบันทึกก่อน เพื่อให้เห็นฟอร์มแก้ไข
+    switchTab('record');
+
     document.getElementById('editTxId').value = id;
     document.getElementById('txAmount').value = parseFloat(amount).toFixed(2);
 
@@ -730,7 +820,7 @@ async function loadTransactions() {
             <td>${ownerBadge}</td>
             <td class="fw-medium ${tx.type === 'expense' ? 'text-danger' : 'text-success'}">${tx.type === 'expense' ? 'รายจ่าย 🔴' : 'รายรับ 🟢'}</td>
             <td class="fw-semibold ${tx.category_name === 'สลิปรอระบุหมวดหมู่' ? 'text-warning' : ''}">
-                ${tx.category_name === 'สลิปรอระบุหมวดหมู่' ? '⏳ รอระบุหมวดหมู่' : tx.category_name}
+                ${tx.category_name === 'สลิปรอระบุหมวดหมู่' ? '⏳ รอระบุหมวดหมู่' : getCategoryEmoji(tx.category_name)}
             </td>
             <td class="fw-bold">${txAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</td>
             <td class="text-muted small">${displayNoteText || '-'}</td>
@@ -918,7 +1008,7 @@ function renderAnalytics(summary, total) {
     if (sortedCats.length === 0) { area.innerHTML = '<p class="text-center text-muted py-3 w-100 mb-0">❌ ไม่พบสัดส่วนข้อมูลรายจ่ายตามตัวกรองนี้</p>'; return; }
     sortedCats.forEach(item => {
         const percentage = total > 0 ? ((item.amount / total) * 100).toFixed(1) : 0; const col = document.createElement('div'); col.className = "col-12 col-md-6";
-        col.innerHTML = `<div class="bg-light p-3 rounded-3 border"><div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-dark">🛒 ${item.name === 'สลิปรอระบุหมวดหมู่' ? '⏳ รอระบุหมวดหมู่' : item.name}</span><span class="text-secondary">${item.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ. (${percentage}%)</span></div><div class="progress" style="height: 6px;"><div class="progress-bar ${item.name === 'สลิปรอระบุหมวดหมู่' ? 'bg-warning' : 'bg-danger'}" style="width: ${percentage}%"></div></div></div>`;
+        col.innerHTML = `<div class="bg-light p-3 rounded-3 border"><div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-dark">${item.name === 'สลิปรอระบุหมวดหมู่' ? '⏳ รอระบุหมวดหมู่' : getCategoryEmoji(item.name)}</span><span class="text-secondary">${item.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ. (${percentage}%)</span></div><div class="progress" style="height: 6px;"><div class="progress-bar ${item.name === 'สลิปรอระบุหมวดหมู่' ? 'bg-warning' : 'bg-danger'}" style="width: ${percentage}%"></div></div></div>`;
         area.appendChild(col);
     });
 }
