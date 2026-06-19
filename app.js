@@ -82,59 +82,33 @@ function setAllCategoryButtonsLoading(loading) {
     });
 }
 
-// ✨ [ข้อ 5] ฟังก์ชันยืนยันสแกนสลิป — เรียกจากปุ่ม "ยืนยันสแกน" ใน Preview
-async function confirmSlipScan() {
-    const previewArea = document.getElementById('slipPreviewArea');
-    const statusEl = document.getElementById('slipLoadingStatus');
-    const slipInput = document.getElementById('slipInput');
-    const file = slipInput.files[0];
-    if (!file) return;
+// ✨ Batch Slip Scanner — รองรับเลือกหลายรูปพร้อมกัน
+let pendingSlipFiles = []; // ไฟล์ที่รอสแกน
 
-    // ซ่อน preview แสดง loading
-    previewArea.classList.add('d-none');
-    statusEl.classList.remove('d-none');
+// ฟังก์ชันประมวลผลสลิป 1 ใบ (ใช้ร่วมกันทั้ง single/batch)
+async function processSingleSlip(file, liveGeminiKey) {
+    // บีบอัดรูป
+    const compressedFile = await compressImage(file);
 
-    try {
-        // 🔄 1. ดึงคีย์ลับจาก Supabase มาใช้งานแบบ Real-time
-        const { data: secretData, error: secretError } = await supabaseClient
-            .from('system_secrets')
-            .select('key_value')
-            .eq('key_name', 'GEMINI_API_KEY')
-            .single();
+    // อัปโหลดเข้า Supabase Storage
+    const fileExt = compressedFile.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const { error: uploadError } = await supabaseClient.storage.from('slips').upload(fileName, compressedFile);
+    if (uploadError) throw uploadError;
 
-        if (secretError || !secretData) {
-            throw new Error("ระบบหา API Key ในฐานข้อมูลไม่เจอ กรุณาเช็คตาราง system_secrets ครับ");
-        }
+    // แปลงเป็น Base64
+    const base64Data = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(compressedFile);
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    });
 
-        const liveGeminiKey = secretData.key_value;
-
-        // 2. บีบอัดรูปภาพ
-        const compressedFile = await compressImage(file);
-
-        // 3. อัปโหลดเข้าถังพักชั่วคราว Supabase Storage
-        const fileExt = compressedFile.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        const { data: uploadData, error: uploadError } = await supabaseClient
-            .storage
-            .from('slips')
-            .upload(fileName, compressedFile);
-
-        if (uploadError) throw uploadError;
-
-        // 4. แปลงภาพสลิปเป็น Base64
-        const base64Data = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(compressedFile);
-            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        });
-
-        // 5. ส่งให้ Gemini ทำงาน — ✨ [ข้อ 3] Prompt ใหม่แกะข้อมูลเพิ่ม
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${liveGeminiKey}`;
-        const promptPayload = {
-            contents: [{
-                parts: [
-                    { text: `นี่คือรูปสลิปโอนเงินของธนาคารในไทย ให้แกะข้อมูลต่อไปนี้จากสลิป:
+    // ส่ง Gemini
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${liveGeminiKey}`;
+    const promptPayload = {
+        contents: [{
+            parts: [
+                { text: `นี่คือรูปสลิปโอนเงินของธนาคารในไทย ให้แกะข้อมูลต่อไปนี้จากสลิป:
 1. "amount" — ยอดเงินสุทธิที่โอนสำเร็จ (Total/Amount) เป็นตัวเลขทศนิยม เช่น 150.00
 2. "date" — วันที่ทำรายการในรูปแบบ YYYY-MM-DD (เช่น 2026-06-19) ถ้าไม่มีให้ใส่ null
 3. "receiver" — ชื่อผู้รับเงินหรือชื่อร้านค้า/บัญชีปลายทาง ถ้าไม่มีให้ใส่ null
@@ -143,75 +117,160 @@ async function confirmSlipScan() {
 
 ตอบกลับเฉพาะ JSON เท่านั้น ตัวอย่าง:
 {"amount": 150.00, "date": "2026-06-19", "receiver": "นาย ก", "bank": "กสิกร", "category_suggestion": "อาหาร"}` },
-                    { inlineData: { mimeType: "image/jpeg", data: base64Data } }
-                ]
-            }],
-            generationConfig: {
-                responseMimeType: "application/json"
-            }
-        };
+                { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+            ]
+        }],
+        generationConfig: { responseMimeType: "application/json" }
+    };
 
-        // 🔄 Retry logic: ถ้าโดน rate limit (429) จะรอแล้วลองใหม่อัตโนมัติ สูงสุด 3 ครั้ง
-        let resData = null;
-        const MAX_RETRIES = 3;
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            const response = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(promptPayload) });
-            resData = await response.json();
-
-            if (response.status === 429 && attempt < MAX_RETRIES) {
-                let waitSec = 30;
-                const retryMatch = JSON.stringify(resData).match(/retry in ([\d.]+)s/i);
-                if (retryMatch) waitSec = Math.ceil(parseFloat(retryMatch[1]));
-
-                showToast(`⏳ API เกินโควต้าชั่วคราว รอ ${waitSec} วินาทีแล้วลองใหม่ครั้งที่ ${attempt + 1}...`, '🔄');
-                await new Promise(r => setTimeout(r, waitSec * 1000));
-                continue;
-            }
-            break;
+    // Retry logic
+    let resData = null;
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const response = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(promptPayload) });
+        resData = await response.json();
+        if (response.status === 429 && attempt < MAX_RETRIES) {
+            let waitSec = 30;
+            const retryMatch = JSON.stringify(resData).match(/retry in ([\d.]+)s/i);
+            if (retryMatch) waitSec = Math.ceil(parseFloat(retryMatch[1]));
+            showToast(`⏳ API เกินโควต้า รอ ${waitSec} วินาที...`, '🔄');
+            await new Promise(r => setTimeout(r, waitSec * 1000));
+            continue;
         }
+        break;
+    }
 
-        if (!resData.candidates || resData.candidates.length === 0) {
-            throw new Error(resData.error?.message || "Google Gemini ปฏิเสธการแกะโครงสร้างสลิปใบนี้");
-        }
+    if (!resData.candidates || resData.candidates.length === 0) {
+        throw new Error(resData.error?.message || "AI ปฏิเสธการแกะสลิปใบนี้");
+    }
 
-        const aiText = resData.candidates[0].content.parts[0].text.trim();
-        const result = JSON.parse(aiText);
+    const aiText = resData.candidates[0].content.parts[0].text.trim();
+    const result = JSON.parse(aiText);
+    return { ...result, fileName };
+}
 
-        // 6. ✨ [ข้อ 3] ใส่ข้อมูลเข้าฟอร์มออโต้ (แกะข้อมูลเพิ่มจาก AI)
-        document.getElementById('txAmount').value = parseFloat(result.amount).toFixed(2);
+// ยืนยันสแกนสลิป (single หรือ batch)
+async function confirmSlipScan() {
+    if (pendingSlipFiles.length === 0) return;
 
-        // สร้างโน้ตอัจฉริยะจากข้อมูลที่ AI แกะได้
-        let smartNote = `[SLIP_URL:${fileName}]`;
-        const infoParts = [];
-        if (result.receiver) infoParts.push(`ผู้รับ: ${result.receiver}`);
-        if (result.bank) infoParts.push(`ผ่าน: ${result.bank}`);
-        if (result.date) infoParts.push(`วันที่: ${result.date}`);
-        if (infoParts.length > 0) {
-            smartNote += ` ${infoParts.join(' | ')}`;
+    const previewArea = document.getElementById('slipPreviewArea');
+    const statusEl = document.getElementById('slipLoadingStatus');
+    const slipInput = document.getElementById('slipInput');
+    const isBatch = pendingSlipFiles.length > 1;
+
+    previewArea.classList.add('d-none');
+    statusEl.classList.remove('d-none');
+
+    try {
+        // ดึง API Key ครั้งเดียว ใช้กับทุกใบ
+        const { data: secretData, error: secretError } = await supabaseClient
+            .from('system_secrets').select('key_value').eq('key_name', 'GEMINI_API_KEY').single();
+        if (secretError || !secretData) throw new Error("ระบบหา API Key ไม่เจอ กรุณาเช็คตาราง system_secrets");
+        const liveGeminiKey = secretData.key_value;
+
+        if (isBatch) {
+            // === Batch Mode: สแกนทีละใบ + auto-save ===
+            const totalFiles = pendingSlipFiles.length;
+            let successCount = 0;
+            let failCount = 0;
+            const results = [];
+
+            for (let i = 0; i < totalFiles; i++) {
+                // อัปเดต loading status
+                statusEl.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> 🤖 กำลังสแกนสลิปใบที่ ${i + 1} จาก ${totalFiles}...`;
+
+                try {
+                    const result = await processSingleSlip(pendingSlipFiles[i], liveGeminiKey);
+
+                    // สร้างโน้ตอัจฉริยะ
+                    let smartNote = `[SLIP_URL:${result.fileName}]`;
+                    const infoParts = [];
+                    if (result.receiver) infoParts.push(`ผู้รับ: ${result.receiver}`);
+                    if (result.bank) infoParts.push(`ผ่าน: ${result.bank}`);
+                    if (result.date) infoParts.push(`วันที่: ${result.date}`);
+                    smartNote += infoParts.length > 0 ? ` ${infoParts.join(' | ')}` : ' สแกนจากสลิป (Batch)';
+
+                    // Auto-save ลง Supabase ทันที
+                    let dbOwner = document.getElementById('txOwner').value || 'me';
+                    let finalNote = smartNote;
+                    if (dbOwner === 'shared-me') { dbOwner = 'shared'; finalNote = `[จ่ายโดย: me] ${finalNote}`; }
+                    else if (dbOwner === 'shared-partner') { dbOwner = 'shared'; finalNote = `[จ่ายโดย: partner] ${finalNote}`; }
+
+                    await supabaseClient.from('transactions').insert([{
+                        amount: parseFloat(parseFloat(result.amount).toFixed(2)),
+                        type: 'expense',
+                        category_name: 'สลิปรอระบุหมวดหมู่',
+                        note: finalNote,
+                        owner: dbOwner
+                    }]);
+
+                    results.push({ success: true, amount: result.amount, receiver: result.receiver });
+                    successCount++;
+                } catch (err) {
+                    console.error(`Slip ${i + 1} error:`, err);
+                    results.push({ success: false, error: err.message });
+                    failCount++;
+                }
+
+                // รอ 2 วินาทีระหว่างแต่ละใบ เพื่อหลีกเลี่ยง rate limit
+                if (i < totalFiles - 1) {
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            }
+
+            // แสดงสรุปผล Batch
+            let summaryHTML = `<div class="text-center"><p class="fw-bold text-dark mb-2">📊 สรุปผลสแกน ${totalFiles} สลิป</p>`;
+            summaryHTML += `<div class="d-flex justify-content-center gap-3 mb-2">`;
+            summaryHTML += `<span class="badge bg-success px-3 py-2">✅ สำเร็จ ${successCount} ใบ</span>`;
+            if (failCount > 0) summaryHTML += `<span class="badge bg-danger px-3 py-2">❌ ล้มเหลว ${failCount} ใบ</span>`;
+            summaryHTML += `</div>`;
+
+            // แสดงรายละเอียดแต่ละใบ
+            summaryHTML += `<div class="text-start mt-2">`;
+            results.forEach((r, idx) => {
+                if (r.success) {
+                    summaryHTML += `<div class="small text-success mb-1">✅ ใบที่ ${idx + 1}: ${parseFloat(r.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท${r.receiver ? ` → ${r.receiver}` : ''}</div>`;
+                } else {
+                    summaryHTML += `<div class="small text-danger mb-1">❌ ใบที่ ${idx + 1}: ${r.error}</div>`;
+                }
+            });
+            summaryHTML += `</div></div>`;
+
+            previewArea.innerHTML = summaryHTML;
+            previewArea.classList.remove('d-none');
+            showToast(`สแกน Batch เสร็จ! สำเร็จ ${successCount}/${totalFiles} ใบ`, '🤖');
+            await loadTransactions();
+
         } else {
-            smartNote += ' รอคุณระบุชื่อรายการจริง';
-        }
-        document.getElementById('txNote').value = smartNote;
+            // === Single Mode: แกะข้อมูลใส่ฟอร์ม ===
+            const result = await processSingleSlip(pendingSlipFiles[0], liveGeminiKey);
 
-        // แสดงผลลัพธ์ AI ให้ผู้ใช้เห็นใน Preview Area
-        let aiResultHTML = `<div class="mt-2 p-2 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25">
-            <p class="small fw-bold text-success mb-1">🤖 AI แกะข้อมูลสำเร็จ:</p>
-            <ul class="list-unstyled small mb-0 text-dark">
-                <li>💰 ยอดเงิน: <b>${parseFloat(result.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</b></li>`;
-        if (result.receiver) aiResultHTML += `<li>👤 ผู้รับ: <b>${result.receiver}</b></li>`;
-        if (result.bank) aiResultHTML += `<li>🏦 ธนาคาร: <b>${result.bank}</b></li>`;
-        if (result.date) aiResultHTML += `<li>📅 วันที่: <b>${result.date}</b></li>`;
-        if (result.category_suggestion) aiResultHTML += `<li>🏷️ หมวดหมู่ที่แนะนำ: <b>${result.category_suggestion}</b></li>`;
-        aiResultHTML += `</ul></div>`;
+            document.getElementById('txAmount').value = parseFloat(result.amount).toFixed(2);
+            let smartNote = `[SLIP_URL:${result.fileName}]`;
+            const infoParts = [];
+            if (result.receiver) infoParts.push(`ผู้รับ: ${result.receiver}`);
+            if (result.bank) infoParts.push(`ผ่าน: ${result.bank}`);
+            if (result.date) infoParts.push(`วันที่: ${result.date}`);
+            smartNote += infoParts.length > 0 ? ` ${infoParts.join(' | ')}` : ' รอคุณระบุชื่อรายการจริง';
+            document.getElementById('txNote').value = smartNote;
 
-        previewArea.innerHTML = `
-            <div class="text-center">
+            // แสดงผลลัพธ์ AI
+            let aiResultHTML = `<div class="mt-2 p-2 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25">
+                <p class="small fw-bold text-success mb-1">🤖 AI แกะข้อมูลสำเร็จ:</p>
+                <ul class="list-unstyled small mb-0 text-dark">
+                    <li>💰 ยอดเงิน: <b>${parseFloat(result.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</b></li>`;
+            if (result.receiver) aiResultHTML += `<li>👤 ผู้รับ: <b>${result.receiver}</b></li>`;
+            if (result.bank) aiResultHTML += `<li>🏦 ธนาคาร: <b>${result.bank}</b></li>`;
+            if (result.date) aiResultHTML += `<li>📅 วันที่: <b>${result.date}</b></li>`;
+            if (result.category_suggestion) aiResultHTML += `<li>🏷️ หมวดหมู่แนะนำ: <b>${result.category_suggestion}</b></li>`;
+            aiResultHTML += `</ul></div>`;
+
+            previewArea.innerHTML = `<div class="text-center">
                 <span class="text-success small fw-bold">✅ สแกนเรียบร้อย กรุณาเลือกกระเป๋าเงินและหมวดหมู่เพื่อบันทึก</span>
-                ${aiResultHTML}
-            </div>`;
-        previewArea.classList.remove('d-none');
-
-        showToast('AI แกะข้อมูลจากสลิปเรียบร้อยแล้วจ้า! กรุณากดเลือกกระเป๋าเงินและปุ่มหมวดหมู่เพื่อบันทึกต่อได้เลย', '🤖');
+                ${aiResultHTML}</div>`;
+            previewArea.classList.remove('d-none');
+            showToast('AI แกะข้อมูลจากสลิปเรียบร้อย! กรุณากดเลือกหมวดหมู่เพื่อบันทึก', '🤖');
+        }
 
     } catch (err) {
         console.error(err);
@@ -219,46 +278,82 @@ async function confirmSlipScan() {
         previewArea.classList.add('d-none');
     } finally {
         statusEl.classList.add('d-none');
+        statusEl.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> กำลังใช้ AI ถอดรหัสยอดเงินจากสลิปสักครู่...`;
+        pendingSlipFiles = [];
+        slipInput.value = '';
     }
 }
 
-// ✨ [ข้อ 5] ยกเลิก Preview สลิป
+// ลบรูปสลิปออกจากคิว preview
+function removeSlipFromQueue(index) {
+    pendingSlipFiles.splice(index, 1);
+    if (pendingSlipFiles.length === 0) {
+        cancelSlipPreview();
+    } else {
+        renderSlipPreviews();
+    }
+}
+
+// ยกเลิก Preview ทั้งหมด
 function cancelSlipPreview() {
     const slipInput = document.getElementById('slipInput');
     const previewArea = document.getElementById('slipPreviewArea');
     slipInput.value = '';
+    pendingSlipFiles = [];
     previewArea.classList.add('d-none');
 }
 
-// ✨ [ข้อ 5] ดักจับสลิปเวอร์ชันใหม่ — แสดง Preview ก่อนส่ง AI
+// แสดง Preview รูปทั้งหมดที่เลือก
+function renderSlipPreviews() {
+    const previewArea = document.getElementById('slipPreviewArea');
+    const count = pendingSlipFiles.length;
+
+    let html = `<p class="small fw-bold text-secondary mb-2 text-center">🖼️ ตรวจสอบรูปสลิป ${count} ใบก่อนส่ง AI สแกน</p>`;
+    html += `<div class="d-flex flex-wrap gap-2 justify-content-center mb-3">`;
+
+    pendingSlipFiles.forEach((file, idx) => {
+        const url = URL.createObjectURL(file);
+        html += `<div class="position-relative" style="width: 100px; height: 100px;">
+            <img src="${url}" class="rounded-3 border" style="width: 100%; height: 100%; object-fit: cover;" alt="Slip ${idx + 1}">
+            <button onclick="removeSlipFromQueue(${idx})" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; border-radius: 50%; font-size: 0.6rem; transform: translate(30%, -30%);">✕</button>
+            <span class="position-absolute bottom-0 start-50 translate-middle-x badge bg-dark bg-opacity-75 rounded-pill" style="font-size: 0.6rem;">${idx + 1}</span>
+        </div>`;
+    });
+
+    html += `</div>`;
+
+    // ข้อความแจ้งเตือน batch mode
+    if (count > 1) {
+        html += `<div class="alert alert-info py-2 px-3 rounded-3 border-0 small mb-3 text-center">
+            <i class="bi bi-info-circle me-1"></i> <b>โหมด Batch:</b> AI จะสแกนทีละใบแล้วบันทึกรายจ่ายให้อัตโนมัติ (รอระบุหมวดหมู่ภายหลัง)
+            <br><span class="text-muted">⏱️ ใช้เวลาประมาณ ${count * 5}-${count * 35} วินาที ขึ้นอยู่กับ API โควต้า</span>
+        </div>`;
+    }
+
+    html += `<div class="d-flex justify-content-center gap-2">
+        <button onclick="confirmSlipScan()" class="btn btn-success btn-sm fw-bold px-3 rounded-3">
+            <i class="bi bi-robot me-1"></i> ✅ ยืนยันสแกน${count > 1 ? `ทั้ง ${count} ใบ` : ''}
+        </button>
+        <button onclick="cancelSlipPreview()" class="btn btn-outline-secondary btn-sm fw-bold px-3 rounded-3">
+            ❌ ยกเลิก
+        </button>
+    </div>`;
+
+    previewArea.innerHTML = html;
+    previewArea.classList.remove('d-none');
+}
+
+// ดักจับเลือกไฟล์ — รองรับ multiple
 function setupSlipScannerListener() {
     const slipInput = document.getElementById('slipInput');
     if (!slipInput) return;
 
-    slipInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    slipInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
 
-        // แสดง Preview รูปสลิปก่อนส่ง AI
-        const previewArea = document.getElementById('slipPreviewArea');
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            previewArea.innerHTML = `
-                <div class="text-center">
-                    <p class="small fw-bold text-secondary mb-2">🖼️ ตรวจสอบรูปสลิปก่อนส่ง AI สแกน</p>
-                    <img src="${event.target.result}" class="img-fluid rounded-3 border mb-2" style="max-height: 250px; object-fit: contain;" alt="Slip Preview">
-                    <div class="d-flex justify-content-center gap-2 mt-2">
-                        <button onclick="confirmSlipScan()" class="btn btn-success btn-sm fw-bold px-3 rounded-3">
-                            <i class="bi bi-robot me-1"></i> ✅ ยืนยันส่งสแกน
-                        </button>
-                        <button onclick="cancelSlipPreview()" class="btn btn-outline-secondary btn-sm fw-bold px-3 rounded-3">
-                            ❌ ยกเลิก
-                        </button>
-                    </div>
-                </div>`;
-            previewArea.classList.remove('d-none');
-        };
-        reader.readAsDataURL(file);
+        pendingSlipFiles = files;
+        renderSlipPreviews();
     });
 }
 
