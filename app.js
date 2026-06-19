@@ -94,11 +94,11 @@ function initUserIdentity(userId) {
     const txOwnerInput = document.getElementById('txOwner');
     if (userId === '4ffee1dd-ff34-47c0-a623-7dcc76d80c0f') {
         currentUserRole = 'me';
-        userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">คุณเดฟ (แอดมิน)</span>`;
+        userDisplay.innerHTML = `🙋‍♂️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-primary">คุณโบ๊ท</span>`;
         if (txOwnerInput) txOwnerInput.value = 'me';
     } else {
         currentUserRole = 'partner';
-        userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">คุณแฟนคนสวย</span>`;
+        userDisplay.innerHTML = `🙋‍♀️ ผู้ใช้งานระบบปัจจุบัน: <span class="text-danger">คุณเอิร์น</span>`;
         if (txOwnerInput) txOwnerInput.value = 'partner';
     }
 }
@@ -798,12 +798,12 @@ async function loadTransactions() {
 
     pageItems.forEach(({ tx, txDate, txAmount, exactOwner, cleanNote }) => {
         let ownerBadge = '';
-        if (exactOwner === 'me') ownerBadge = '<span class="badge bg-primary-subtle text-primary">🙋‍♂️ ฉัน</span>';
-        else if (exactOwner === 'partner') ownerBadge = '<span class="badge bg-danger-subtle text-danger">🙋‍♀️ แฟน</span>';
+        if (exactOwner === 'me') ownerBadge = '<span class="badge bg-primary-subtle text-primary">🙋‍♂️ คุณโบ๊ท</span>';
+        else if (exactOwner === 'partner') ownerBadge = '<span class="badge bg-danger-subtle text-danger">🙋‍♀️ คุณเอิร์น</span>';
         else if (exactOwner === 'emergency') ownerBadge = '<span class="badge bg-success text-white">🎯 ออมฉุกเฉิน</span>';
-        else if (exactOwner === 'shared-me') ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง (ฉันจ่าย)</span>';
-        else if (exactOwner === 'shared-partner') ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง (แฟนจ่าย)</span>';
-        else ownerBadge = '<span class="badge bg-warning text-dark">🤝 ส่วนกลาง</span>';
+        else if (exactOwner === 'shared-me') ownerBadge = '<span class="badge bg-warning text-dark">🤝 กองกลาง (โบ๊ทจ่าย)</span>';
+        else if (exactOwner === 'shared-partner') ownerBadge = '<span class="badge bg-warning text-dark">🤝 กองกลาง (เอิร์นจ่าย)</span>';
+        else ownerBadge = '<span class="badge bg-warning text-dark">🤝 กองกลาง</span>';
 
         let displayNoteText = cleanNote;
         if (displayNoteText.includes('[SLIP_URL:')) {
@@ -845,10 +845,10 @@ async function loadTransactions() {
         billTextEl.innerHTML = `<div class="text-center py-2">🎉 ยังไม่มีรายจ่ายกองกลางร่วมกันในเดือนนี้<br><span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะช่วยหารครึ่งทันทีเมื่อจดรายการผ่านกระเป๋า "กองกลาง")</span></div>`;
     } else {
         const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared; const halfShare = grandSharedExpense / 2; let settlementResultText = "";
-        if (totalMePaidShared > totalPartnerPaidShared) { const diff = totalMePaidShared - halfShare; settlementResultText = `🙋‍♀️ แฟนต้องโอนคืนให้คุณ: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
-        else if (totalPartnerPaidShared > totalMePaidShared) { const diff = totalPartnerPaidShared - halfShare; settlementResultText = `🙋‍♂️ คุณต้องโอนคืนให้แฟน: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
+        if (totalMePaidShared > totalPartnerPaidShared) { const diff = totalMePaidShared - halfShare; settlementResultText = `🙋‍♀️ คุณเอิร์น ต้องโอนคืนให้ คุณโบ๊ท: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
+        else if (totalPartnerPaidShared > totalMePaidShared) { const diff = totalPartnerPaidShared - halfShare; settlementResultText = `🙋‍♂️ คุณโบ๊ท ต้องโอนคืนให้ คุณเอิร์น: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
         else { settlementResultText = `🤝 ยอดออกเงินคนละครึ่งเท่ากันเป๊ะ พอดิบพอดีจ้า!`; }
-        billTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• คุณควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | แฟนควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
+        billTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• คุณโบ๊ท ควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | คุณเอิร์น ควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
     }
     renderAnalytics(categorySummary, totalExpenseFiltered);
 
@@ -903,7 +903,7 @@ function exportCSV() {
     const BOM = '\uFEFF';
     const headers = ['วันที่', 'กระเป๋า', 'ประเภท', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึก'];
     const rows = filteredTxsCache.map(({ tx, txDate, txAmount, exactOwner }) => {
-        const ownerMap = { 'me': 'ฉัน', 'partner': 'แฟน', 'shared': 'กองกลาง', 'shared-me': 'กองกลาง (ฉันจ่าย)', 'shared-partner': 'กองกลาง (แฟนจ่าย)', 'emergency': 'ออมฉุกเฉิน' };
+        const ownerMap = { 'me': 'คุณโบ๊ท', 'partner': 'คุณเอิร์น', 'shared': 'กองกลาง', 'shared-me': 'กองกลาง (โบ๊ทจ่าย)', 'shared-partner': 'กองกลาง (เอิร์นจ่าย)', 'emergency': 'ออมฉุกเฉิน' };
         const dateStr = txDate.toLocaleString('th-TH', { hour12: false });
         let note = (tx.note || '').replace(/\[SLIP_URL:.*?\]/g, '').replace(/\[จ่ายโดย:.*?\]/g, '').trim();
         // Escape double quotes in CSV
