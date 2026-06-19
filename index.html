@@ -415,6 +415,14 @@
                     </div>
                 </div>
 
+                <!-- 🏷️ แก้ไขหมวดหมู่รายการ (แสดงเฉพาะตอนอยู่ในโหมดแก้ไข) -->
+                <div id="editCategoryArea" class="d-none mb-4 p-3 bg-warning bg-opacity-10 rounded-4 border border-warning border-opacity-25">
+                    <label for="txCategory" class="form-label small fw-bold text-warning-emphasis mb-1">🏷️ ระบุ/แก้ไขหมวดหมู่รายการ</label>
+                    <select id="txCategory" class="form-select form-control-lg fw-bold border-warning border-opacity-25 bg-white text-dark">
+                        <!-- โหลดหมวดหมู่ไดนามิกผ่าน JS -->
+                    </select>
+                </div>
+
                 <!-- 🎯 จุดประสงค์ของการออมครั้งนี้ (แสดงเมื่อเลือกกระเป๋าเงินออมฉุกเฉิน) -->
                 <div id="emergencyPurposeArea" class="d-none p-3 bg-success bg-opacity-10 rounded-4 border border-success border-opacity-25 mb-4">
                     <label for="txSavingPurpose" class="form-label small fw-bold text-success mb-1">🎯 ออมเงินครั้งนี้เพื่ออะไร? (เช่น เก็บเงินค่าท่องเที่ยว, ค่าของขวัญ)</label>
