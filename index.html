@@ -130,6 +130,28 @@
         .preset-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
         .preset-btn { border-radius: 10px !important; font-size: 0.8rem !important; padding: 4px 10px !important; border: 1px dashed var(--card-border) !important; color: var(--color-text) !important; background: transparent; transition: all 0.15s ease; font-weight: 600; }
         .preset-btn:hover { background-color: var(--light-bg); border-color: #6366f1 !important; color: #6366f1 !important; transform: translateY(-1px); }
+        
+        /* 🌀 Animations & Skeletons */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.55; }
+            50% { opacity: 1; }
+        }
+        .skeleton-pulse {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        .cursor-pointer {
+            cursor: pointer;
+        }
+        /* Edit Affordance for Emergency Goal Title */
+        #emergencyTargetTitleInput {
+            transition: all 0.2s ease;
+            border-radius: 6px;
+            padding: 2px 4px !important;
+        }
+        #emergencyTargetTitleInput:hover, #emergencyTargetTitleInput:focus {
+            background-color: var(--light-bg) !important;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+        }
     </style>
 </head>
 <body class="py-4">
@@ -219,15 +241,18 @@
             <div class="row g-4 mb-4">
                 <div class="col-12 col-md-6">
                     <div class="premium-card mb-0 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap pb-2 border-bottom border-light border-opacity-25" style="gap: 16px; row-gap: 16px;">
                             <div class="d-flex align-items-center gap-1.5 flex-fill">
                                 <span class="text-success"><i class="bi bi-shield-fill-check fs-5"></i></span>
-                                <input type="text" id="emergencyTargetTitleInput" onchange="updateEmergencyTargetTitle(this.value)" class="form-control form-control-sm fw-bold text-dark border-0 bg-transparent p-0" style="font-size: 0.95rem; width: auto; max-width: 215px; box-shadow: none !important;" value="ความคืบหน้าเงินออมฉุกเฉิน" placeholder="พิมพ์ชื่อเป้าหมายการออม...">
+                                <input type="text" id="emergencyTargetTitleInput" onchange="updateEmergencyTargetTitle(this.value)" class="form-control form-control-sm fw-bold text-dark border-0 bg-transparent p-0" style="font-size: 0.95rem; width: auto; max-width: 185px; box-shadow: none !important;" value="ความคืบหน้าเงินออมฉุกเฉิน" placeholder="พิมพ์ชื่อเป้าหมายการออม...">
+                                <i class="bi bi-pencil-fill text-muted ms-1 cursor-pointer" style="font-size: 0.75rem;" onclick="document.getElementById('emergencyTargetTitleInput').focus()" title="คลิกเพื่อแก้ไขชื่อเป้าหมาย"></i>
                             </div>
                             <div class="d-flex align-items-center gap-1">
                                 <span class="small text-muted" style="font-size: 0.75rem;">เป้าหมาย:</span>
                                 <input type="number" id="emergencyTargetInput" onchange="updateEmergencyTarget(this.value)" class="form-control form-control-xs py-0.5 px-2 fw-bold text-dark border-secondary" style="width: 85px; font-size: 0.75rem; border-radius: 8px !important; padding: 0.2rem 0.4rem !important;" value="50000">
                                 <span class="small text-muted" style="font-size: 0.75rem;">บ.</span>
                             </div>
+                        </div>
                         <div class="progress mt-3" style="height: 20px; border-radius: 10px;">
                             <div id="emergencyProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%; border-radius: 10px; font-size: 0.75rem; font-weight: bold; line-height: 20px;">0%</div>
                         </div>
@@ -241,7 +266,11 @@
                     <div class="premium-card mb-0 h-100" id="aiInsightCard" style="border: 1px solid rgba(99, 102, 241, 0.25) !important;">
                         <h6 class="fw-bold text-dark mb-2 d-flex align-items-center"><i class="bi bi-chat-heart-fill text-indigo me-2"></i> คำแนะนำการเงินอัจฉริยะ</h6>
                         <div id="aiInsightContent" class="small text-secondary">
-                            กำลังวิเคราะห์ข้อมูลรายรับรายจ่ายประจำเดือน...
+                            <div class="skeleton-pulse d-flex flex-column gap-2 py-1">
+                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 85%;"></div>
+                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 70%;"></div>
+                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 90%;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -252,7 +281,12 @@
                     <div class="card text-white border-0 p-3 shadow-sm" style="background: linear-gradient(135deg, #4f46e5, #3730a3); border-radius: 24px; min-height: 215px;">
                         <h6 class="fw-bold mb-2 d-flex align-items-center justify-content-center justify-content-md-start"><i class="bi bi-calculator-fill me-2"></i> บิลหารครึ่งประจำรอบเดือน</h6>
                         <div class="p-2.5 bg-white bg-opacity-10 rounded-4 my-auto text-center">
-                            <div id="billSummaryText" class="small fw-medium mb-0">กำลังประมวลผลกระแสเงินสด...</div>
+                            <div id="billSummaryText" class="small fw-medium mb-0">
+                                <div class="skeleton-pulse py-1">
+                                    <div class="bg-white bg-opacity-25 rounded mx-auto mb-2" style="height: 14px; width: 60%;"></div>
+                                    <div class="bg-white bg-opacity-20 rounded mx-auto" style="height: 10px; width: 80%;"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -263,7 +297,12 @@
                             <h6 class="fw-bold text-dark mb-0 d-flex align-items-center"><i class="bi bi-trophy-fill text-warning me-2"></i> Checklist ภารกิจเงิน</h6>
                             <span id="checklistMonthLabel" class="badge bg-light text-secondary border-0 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;"></span>
                         </div>
-                        <div id="goalsList" class="overflow-y-auto pe-1" style="max-height: 150px;"></div>
+                        <div id="goalsList" class="overflow-y-auto pe-1" style="max-height: 150px;">
+                            <div class="skeleton-pulse d-flex flex-column gap-2">
+                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 32px; width: 100%;"></div>
+                                <div class="bg-secondary bg-opacity-10 rounded" style="height: 32px; width: 100%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -440,11 +479,11 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr class="table-light text-secondary small">
-                                <th class="py-3">วัน-เวลา</th>
-                                <th class="py-3">กระเป๋า</th>
-                                <th class="py-3">ประเภท</th>
-                                <th class="py-3">หมวดหมู่</th>
-                                <th class="py-3">จำนวนเงิน</th>
+                                <th onclick="toggleSort('date')" class="py-3 cursor-pointer" style="user-select: none;">วัน-เวลา <span id="sort-icon-date">▼</span></th>
+                                <th onclick="toggleSort('owner')" class="py-3 cursor-pointer" style="user-select: none;">กระเป๋า <span id="sort-icon-owner"></span></th>
+                                <th onclick="toggleSort('type')" class="py-3 cursor-pointer" style="user-select: none;">ประเภท <span id="sort-icon-type"></span></th>
+                                <th onclick="toggleSort('category')" class="py-3 cursor-pointer" style="user-select: none;">หมวดหมู่ <span id="sort-icon-category"></span></th>
+                                <th onclick="toggleSort('amount')" class="py-3 cursor-pointer" style="user-select: none;">จำนวนเงิน <span id="sort-icon-amount"></span></th>
                                 <th class="py-3">บันทึก</th>
                                 <th class="py-3 text-center">จัดการ</th>
                             </tr>
@@ -465,12 +504,30 @@
 
             <div class="premium-card">
                 <h5 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-graph-up text-success me-2"></i> กราฟแนวโน้มรายเดือน (6 เดือนย้อนหลัง)</h5>
-                <div id="monthlyTrendArea"><p class="text-center text-muted py-4 small">กำลังโหลดกราฟ...</p></div>
+                <div id="monthlyTrendArea">
+                    <div class="skeleton-pulse d-flex align-items-end justify-content-between gap-2 px-3 py-4" style="height: 150px;">
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 40%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 70%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 55%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 90%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 30%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 80%; width: 12%;"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="premium-card">
                 <h5 class="fw-bold text-dark mb-3 d-flex align-items-center"><i class="bi bi-shield-shaded text-success me-2"></i> กราฟสะสมเงินออมฉุกเฉิน (6 เดือนย้อนหลัง)</h5>
-                <div id="savingsTrendArea"><p class="text-center text-muted py-4 small">กำลังโหลดกราฟออมเงิน...</p></div>
+                <div id="savingsTrendArea">
+                    <div class="skeleton-pulse d-flex align-items-end justify-content-between gap-2 px-3 py-4" style="height: 150px;">
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 25%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 45%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 60%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 75%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 90%; width: 12%;"></div>
+                        <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 95%; width: 12%;"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

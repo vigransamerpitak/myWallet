@@ -5,6 +5,8 @@ let filterType = 'all';
 let filterDate = 'this-month';
 let currentUserRole = 'me';
 let isSaving = false; // 🔒 ป้องกันกดซ้ำ (Loading State)
+let currentSortField = 'date';
+let currentSortOrder = 'desc';
 
 // ✨ [ข้อ 6] Pagination State
 let currentPage = 1;
@@ -498,7 +500,8 @@ async function confirmSlipScan() {
                         type: 'expense',
                         category_name: 'สลิปรอระบุหมวดหมู่',
                         note: finalNote,
-                        owner: dbOwner
+                        owner: dbOwner,
+                        created_at: new Date().toISOString()
                     }]);
 
                     results.push({ success: true, amount: result.amount, receiver: result.receiver });
@@ -789,7 +792,14 @@ async function saveTransaction(categoryName, type) {
 
     const { error } = await supabaseClient
         .from('transactions')
-        .insert([{ amount: finalAmount, type: type, category_name: finalCategory, note: finalNote || null, owner: dbOwner }]);
+        .insert([{
+            amount: finalAmount,
+            type: type,
+            category_name: finalCategory,
+            note: finalNote || null,
+            owner: dbOwner,
+            created_at: new Date().toISOString()
+        }]);
 
     if (error) {
         showToast(`บันทึกไม่สำเร็จ: ${error.message}`, '❌', true);
@@ -802,6 +812,7 @@ async function saveTransaction(categoryName, type) {
         if (previewArea) previewArea.classList.add('d-none');
         ownerInput.value = currentUserRole === 'me' ? 'me' : 'partner';
         showToast('จดบันทึกเรียบร้อยแล้วจ้า! 💰', '✅');
+        cancelSlipPreview();
 
         // ⚙️ ระบบหักออมอัตโนมัติเมื่อมีรายรับ
         const autoSaveEnabled = localStorage.getItem('autoSaveEnabled') === 'true';
@@ -818,7 +829,8 @@ async function saveTransaction(categoryName, type) {
                     type: 'expense',
                     category_name: 'ลงทุน',
                     note: deductNote,
-                    owner: dbOwner
+                    owner: dbOwner,
+                    created_at: new Date().toISOString()
                 }]);
 
                 // 2. สร้างรายการรายรับเพิ่มเข้าบัญชีออมฉุกเฉิน
@@ -828,7 +840,8 @@ async function saveTransaction(categoryName, type) {
                     type: 'income',
                     category_name: 'ลงทุน',
                     note: addNote,
-                    owner: 'emergency'
+                    owner: 'emergency',
+                    created_at: new Date().toISOString()
                 }]);
                 
                 showToast(`หักออมอัตโนมัติ ${pct}% (${autoSaveAmt.toLocaleString()} บ.) เข้าคลังเรียบร้อย! 🎯`, '🎯');
@@ -922,6 +935,7 @@ function cancelEditMode() {
     const recordBox = document.getElementById('recordBox'); recordBox.style.backgroundColor = '#ffffff'; recordBox.style.borderColor = 'transparent';
     document.getElementById('recordBoxTitle').innerHTML = '<i class="bi bi-plus-square-fill text-success me-2"></i> บันทึกรายการใหม่';
     document.getElementById('categoryActionArea').classList.remove('d-none'); document.getElementById('editActionArea').classList.add('d-none');
+    cancelSlipPreview();
 }
 
 // ✨ [ข้อ 4] submitEditTransaction พร้อม Loading State
@@ -1017,6 +1031,15 @@ async function createNewGoalFrontend() {
 }
 
 async function loadGoals() {
+    const goalsList = document.getElementById('goalsList');
+    if (goalsList) {
+        goalsList.innerHTML = `
+            <div class="skeleton-pulse d-flex flex-column gap-2">
+                <div class="bg-secondary bg-opacity-10 rounded" style="height: 32px; width: 100%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded" style="height: 32px; width: 100%;"></div>
+            </div>
+        `;
+    }
     const now = new Date(); let targetMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (filterDate === 'last-month') { let prevMonth = now.getMonth() - 1; let prevYear = now.getFullYear(); if (prevMonth < 0) { prevMonth = 11; prevYear--; } targetMonthStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`; }
     document.getElementById('checklistMonthLabel').innerText = filterDate === 'all' ? 'ทุกช่วงเวลา' : `ประจำเดือน ${targetMonthStr}`;
@@ -1032,7 +1055,7 @@ async function loadGoals() {
         const { data: insertedData, error: insertError } = await supabaseClient.from('goals').insert(defaultGoals).select();
         if (!insertError) { goals = insertedData; showToast(`สร้าง Checklist เดือน ${targetMonthStr} ออโต้จ้า!`, '🎉'); }
     }
-    const goalsList = document.getElementById('goalsList'); goalsList.innerHTML = '';
+    goalsList.innerHTML = '';
     if (!goals || goals.length === 0) { goalsList.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">ไม่มีภารกิจการเงินระบุไว้</p>'; return; }
     goals.forEach(goal => {
         const safeTitle = escapeForAttr(goal.title);
@@ -1059,10 +1082,28 @@ async function settleGoal(id, status, title, amount, type) {
             if (type === 'save_travel') emoji = '✈️';
             else if (type === 'save_shopping') emoji = '🛍️';
             else if (type === 'save_gift') emoji = '🎁';
-            await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'income', category_name: 'ลงทุน', owner: 'emergency', note: `ภารกิจสำเร็จ: ${title}` }]); 
+            await supabaseClient.from('transactions').insert([{
+                amount: finalAmount,
+                type: 'income',
+                category_name: 'ลงทุน',
+                owner: 'emergency',
+                note: `ภารกิจสำเร็จ: ${title}`,
+                created_at: new Date().toISOString()
+            }]); 
             showToast(`ย้ายเงินเข้าบัญชีออมสำเร็จ ${emoji}`, '🎉'); 
         }
-        else { let noteWithTag = `[จ่ายโดย: ${currentUserRole === 'me' ? 'me' : 'partner'}] จ่ายบิลออโต้: ${title}`; await supabaseClient.from('transactions').insert([{ amount: finalAmount, type: 'expense', category_name: 'ค่าที่พัก/บ้าน', owner: 'shared', note: noteWithTag }]); showToast('ตัดยอดบิลส่วนกลางเรียบร้อย 📄', '✅'); }
+        else {
+            let noteWithTag = `[จ่ายโดย: ${currentUserRole === 'me' ? 'me' : 'partner'}] จ่ายบิลออโต้: ${title}`;
+            await supabaseClient.from('transactions').insert([{
+                amount: finalAmount,
+                type: 'expense',
+                category_name: 'ค่าที่พัก/บ้าน',
+                owner: 'shared',
+                note: noteWithTag,
+                created_at: new Date().toISOString()
+            }]);
+            showToast('ตัดยอดบิลส่วนกลางเรียบร้อย 📄', '✅');
+        }
         triggerCelebration();
     } else {
         if (!confirm(`เดือนนี้ล้มเหลว/ข้ามภารกิจ: "${title}" ใช่ไหม?`)) return;
@@ -1082,9 +1123,66 @@ async function resetGoalStatus(id, title) {
 async function deleteGoalFrontend(id) { if (!confirm('ต้องการลบภารกิจนี้ออกจากหน้าจอใช่ไหมครับ?')) return; const { error } = await supabaseClient.from('goals').delete().eq('id', id); if (error) showToast(error.message, '❌', true); else { showToast('ลบภารกิจออกแล้ว', '🗑️'); await loadGoals(); } }
 
 async function loadTransactions() {
+    const tbody = document.getElementById('transactionTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr class="skeleton-pulse">
+                <td colspan="7" class="text-center py-4 text-muted">
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    กำลังโหลดข้อมูลธุรกรรมย้อนหลัง...
+                </td>
+            </tr>
+        `;
+    }
+    const billTextEl = document.getElementById('billSummaryText');
+    if (billTextEl) {
+        billTextEl.innerHTML = `
+            <div class="skeleton-pulse py-1">
+                <div class="bg-white bg-opacity-25 rounded mx-auto mb-2" style="height: 14px; width: 60%;"></div>
+                <div class="bg-white bg-opacity-20 rounded mx-auto" style="height: 10px; width: 80%;"></div>
+            </div>
+        `;
+    }
+    const monthlyTrendArea = document.getElementById('monthlyTrendArea');
+    if (monthlyTrendArea) {
+        monthlyTrendArea.innerHTML = `
+            <div class="skeleton-pulse d-flex align-items-end justify-content-between gap-2 px-3 py-4" style="height: 150px;">
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 40%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 70%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 55%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 90%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 30%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 80%; width: 12%;"></div>
+            </div>
+        `;
+    }
+    const savingsTrendArea = document.getElementById('savingsTrendArea');
+    if (savingsTrendArea) {
+        savingsTrendArea.innerHTML = `
+            <div class="skeleton-pulse d-flex align-items-end justify-content-between gap-2 px-3 py-4" style="height: 150px;">
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 25%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 45%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 60%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 75%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 90%; width: 12%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded-top" style="height: 95%; width: 12%;"></div>
+            </div>
+        `;
+    }
+    const aiInsightContent = document.getElementById('aiInsightContent');
+    if (aiInsightContent) {
+        aiInsightContent.innerHTML = `
+            <div class="skeleton-pulse d-flex flex-column gap-2 py-1">
+                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 85%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 70%;"></div>
+                <div class="bg-secondary bg-opacity-10 rounded" style="height: 12px; width: 90%;"></div>
+            </div>
+        `;
+    }
+
     const { data: txs, error } = await supabaseClient.from('transactions').select('*').order('created_at', { ascending: false });
     if (error) return console.error(error);
-    const tbody = document.getElementById('transactionTableBody'); tbody.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
 
     let myTotal = 0; let partnerTotal = 0; let sharedTotal = 0; let emergencyTotal = 0;
     let totalMePaidShared = 0; let totalPartnerPaidShared = 0;
@@ -1138,6 +1236,34 @@ async function loadTransactions() {
         filteredTxsCache.push({ tx, txDate, txAmount, exactOwner, cleanNote });
     });
 
+    // 🔄 ดำเนินการเรียงลำดับข้อมูลตามที่ผู้เลือก (Sort column)
+    filteredTxsCache.sort((a, b) => {
+        let valA, valB;
+        if (currentSortField === 'date') {
+            valA = a.txDate.getTime();
+            valB = b.txDate.getTime();
+        } else if (currentSortField === 'owner') {
+            valA = a.exactOwner;
+            valB = b.exactOwner;
+        } else if (currentSortField === 'type') {
+            valA = a.tx.type;
+            valB = b.tx.type;
+        } else if (currentSortField === 'category') {
+            valA = a.tx.category_name;
+            valB = b.tx.category_name;
+        } else if (currentSortField === 'amount') {
+            valA = a.txAmount;
+            valB = b.txAmount;
+        } else {
+            valA = a.txDate.getTime();
+            valB = b.txDate.getTime();
+        }
+
+        if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+
     // ✨ [ข้อ 6] Pagination: แสดงเฉพาะหน้าปัจจุบัน
     const totalPages = Math.max(1, Math.ceil(filteredTxsCache.length / ROWS_PER_PAGE));
     if (currentPage > totalPages) currentPage = totalPages;
@@ -1189,15 +1315,15 @@ async function loadTransactions() {
     document.getElementById('sharedTotal').innerText = `${sharedTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
     document.getElementById('emergencyTotal').innerText = `${emergencyTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
 
-    const billTextEl = document.getElementById('billSummaryText');
+    const billSummaryTextEl = document.getElementById('billSummaryText');
     if (totalMePaidShared === 0 && totalPartnerPaidShared === 0) {
-        billTextEl.innerHTML = `<div class="text-center py-2">🎉 ยังไม่มีรายจ่ายกองกลางร่วมกันในเดือนนี้<br><span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะช่วยหารครึ่งทันทีเมื่อจดรายการผ่านกระเป๋า "กองกลาง")</span></div>`;
+        if (billSummaryTextEl) billSummaryTextEl.innerHTML = `<div class="text-center py-2">🎉 ยังไม่มีรายจ่ายกองกลางร่วมกันในเดือนนี้<br><span class="text-white-50 small" style="font-size: 0.8rem;">(ระบบจะช่วยหารครึ่งทันทีเมื่อจดรายการผ่านกระเป๋า "กองกลาง")</span></div>`;
     } else {
         const grandSharedExpense = totalMePaidShared + totalPartnerPaidShared; const halfShare = grandSharedExpense / 2; let settlementResultText = "";
         if (totalMePaidShared > totalPartnerPaidShared) { const diff = totalMePaidShared - halfShare; settlementResultText = `🙋‍♀️ คุณเอิร์น ต้องโอนคืนให้ คุณโบ๊ท: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
         else if (totalPartnerPaidShared > totalMePaidShared) { const diff = totalPartnerPaidShared - halfShare; settlementResultText = `🙋‍♂️ คุณโบ๊ท ต้องโอนคืนให้ คุณเอิร์น: <span class="fw-bold text-warning fs-5">${diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>`; }
         else { settlementResultText = `🤝 ยอดออกเงินคนละครึ่งเท่ากันเป๊ะ พอดิบพอดีจ้า!`; }
-        billTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• คุณโบ๊ท ควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | คุณเอิร์น ควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
+        if (billSummaryTextEl) billSummaryTextEl.innerHTML = `รายจ่ายกองกลางเดือนนี้รวม: <b>${grandSharedExpense.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.</b> (หารครึ่งคนละ ${halfShare.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บ.)<br><div class="text-center mt-2 small text-white-50" style="font-size: 0.8rem;">• คุณโบ๊ท ควักจ่ายล่วงหน้าไป: ${totalMePaidShared.toLocaleString()} บ. | คุณเอิร์น ควักจ่ายล่วงหน้าไป: ${totalPartnerPaidShared.toLocaleString()} บ.</div><hr class="my-2 text-white-50"><div class="text-center">${settlementResultText}</div>`;
     }
     renderAnalytics(categorySummary, totalExpenseFiltered);
 
@@ -1209,6 +1335,7 @@ async function loadTransactions() {
     currentTotalMePaidShared = totalMePaidShared;
     currentTotalPartnerPaidShared = totalPartnerPaidShared;
     updateInsightsAndProgress();
+    updateSortHeadersUI();
 }
 
 // ✨ [ข้อ 6] Pagination Controls
@@ -1434,4 +1561,32 @@ function renderSavingsTrend(allTxs) {
     html += `</div>`;
 
     area.innerHTML = html;
+}
+
+// 🔄 ระบบเรียงลำดับหัวข้อประวัติการทำรายการ (Click-to-Sort)
+function toggleSort(field) {
+    if (currentSortField === field) {
+        currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortField = field;
+        currentSortOrder = 'asc';
+    }
+    currentPage = 1;
+    loadTransactions();
+}
+
+function updateSortHeadersUI() {
+    const fields = ['date', 'owner', 'type', 'category', 'amount'];
+    fields.forEach(field => {
+        const iconEl = document.getElementById(`sort-icon-${field}`);
+        if (iconEl) {
+            if (currentSortField === field) {
+                iconEl.innerText = currentSortOrder === 'asc' ? ' ▲' : ' ▼';
+                iconEl.className = 'text-primary fw-bold ms-1';
+            } else {
+                iconEl.innerText = '';
+                iconEl.className = '';
+            }
+        }
+    });
 }
