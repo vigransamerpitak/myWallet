@@ -578,28 +578,29 @@
             border-color: rgba(255, 255, 255, 0.25);
         }
         .dream-jar-liquid {
-            width: 200%;
+            width: 100%;
             height: 0%; /* Dynamic from JS */
             background: linear-gradient(180deg, #ffb703, #fb8500);
             position: absolute;
             bottom: 0;
-            left: -50%;
-            border-radius: 38%;
-            animation: wave-animation 6s infinite linear;
+            left: 0;
             transition: height 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 0 10px rgba(251, 133, 0, 0.3);
+            box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.3);
         }
-        .dream-jar-liquid-top {
-            width: 100%;
-            height: 5px;
-            background: rgba(255,255,255,0.25);
+        .dream-jar-liquid::before {
+            content: '';
             position: absolute;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 4px;
+            background: #fff;
+            box-shadow: 0 0 8px #fff, 0 0 15px #ffb703;
+            animation: liquid-glow 1.5s infinite alternate ease-in-out;
         }
-        @keyframes wave-animation {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @keyframes liquid-glow {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
         
         /* Sparkles / Heart bubbles floating inside Jar */
@@ -877,9 +878,7 @@
                                     <div class="dream-jar-lid"></div>
                                     <div class="dream-jar-neck"></div>
                                     <div class="dream-jar">
-                                        <div id="dreamJarLiquid" class="dream-jar-liquid">
-                                            <div class="dream-jar-liquid-top"></div>
-                                        </div>
+                                        <div id="dreamJarLiquid" class="dream-jar-liquid"></div>
                                         <!-- Bubbles generated here -->
                                         <div class="sparkle-particle" style="left:20px; animation-delay: 0.2s; width:6px; height:6px;"></div>
                                         <div class="sparkle-particle" style="left:50px; animation-delay: 0.8s; width:8px; height:8px;"></div>
