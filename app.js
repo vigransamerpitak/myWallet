@@ -121,8 +121,25 @@ function setupSlipScannerListener() {
                 }
             };
 
-            const response = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(promptPayload) });
-            const resData = await response.json();
+            // 🔄 Retry logic: ถ้าโดน rate limit (429) จะรอแล้วลองใหม่อัตโนมัติ สูงสุด 3 ครั้ง
+            let resData = null;
+            const MAX_RETRIES = 3;
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                const response = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(promptPayload) });
+                resData = await response.json();
+
+                if (response.status === 429 && attempt < MAX_RETRIES) {
+                    // ดึงเวลารอจาก error message หรือใช้ default 30 วินาที
+                    let waitSec = 30;
+                    const retryMatch = JSON.stringify(resData).match(/retry in ([\d.]+)s/i);
+                    if (retryMatch) waitSec = Math.ceil(parseFloat(retryMatch[1]));
+                    
+                    showToast(`⏳ API เกินโควต้าชั่วคราว รอ ${waitSec} วินาทีแล้วลองใหม่ครั้งที่ ${attempt + 1}...`, '🔄');
+                    await new Promise(r => setTimeout(r, waitSec * 1000));
+                    continue;
+                }
+                break; // สำเร็จหรือ error อื่นที่ไม่ใช่ 429
+            }
             
             if (!resData.candidates || resData.candidates.length === 0) {
                 throw new Error(resData.error?.message || "Google Gemini ปฏิเสธการแกะโครงสร้างสลิปใบนี้");
